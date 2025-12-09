@@ -26,7 +26,8 @@ function App() {
   const [filters, setFilters] = useState({
     kind: 'all',
     rating: 'all',
-    sort: 'newest'
+    sort: 'newest',
+    search: ''
   });
 
   // --- 1. FETCH GLOBAL STATS (The "Big Picture") ---
@@ -39,41 +40,48 @@ function App() {
     if (!error) setStatsData(data);
   };
 
-  // --- 2. FETCH LIST (The "Visible Slice") ---
+  // --- 2. FETCH LIST (With Search Logic) ---
   const fetchEntries = async (pageNumber = 0, currentFilters = filters) => {
     const from = pageNumber * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
     let query = supabase
       .from('entries')
-      .select('*', { count: 'exact' }); // <--- Request total count from DB
+      .select('*', { count: 'exact' });
 
-    // Apply Filters
+    // 1. Apply Search (Title OR Creator)
+    if (currentFilters.search && currentFilters.search.trim() !== '') {
+      const term = currentFilters.search.trim();
+      // .ilike means "case-insensitive like"
+      // This says: Match title OR match creator
+      query = query.or(`title.ilike.%${term}%,creator.ilike.%${term}%`);
+    }
+
+    // 2. Apply Type Filter
     if (currentFilters.kind !== 'all') query = query.eq('kind', currentFilters.kind);
+    
+    // 3. Apply Rating Filter
     if (currentFilters.rating !== 'all') query = query.gte('rating', parseInt(currentFilters.rating));
 
-    // Apply Sort
+    // 4. Apply Sort
     if (currentFilters.sort === 'newest') query = query.order('event_date', { ascending: false });
     else if (currentFilters.sort === 'oldest') query = query.order('event_date', { ascending: true });
     else if (currentFilters.sort === 'highest') query = query.order('rating', { ascending: false });
 
-    // Execute Query
+    // 5. Execute
     const { data, count, error } = await query.range(from, to);
     
     if (error) {
       console.error('Error fetching:', error);
     } else {
-      // Logic to append or replace
       if (pageNumber === 0) {
         setEntries(data);
       } else {
         setEntries((prev) => [...prev, ...data]);
       }
 
-      // Update Pagination & Count
-      setTotalResults(count); // <--- Store the true total
+      setTotalResults(count); 
       
-      // If the list we have is equal to or bigger than total, stop loading
       if ((pageNumber * PAGE_SIZE) + data.length >= count) {
         setHasMore(false);
       } else {
