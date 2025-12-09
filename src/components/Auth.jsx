@@ -9,8 +9,14 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
-    // This sends a "Magic Link" to the user's email
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email,
+      options: {
+        // This line is the magic fix:
+        // It tells Supabase to redirect you back to wherever you currently are.
+        emailRedirectTo: window.location.origin 
+      }
+    });
 
     if (error) {
       alert(error.message);

@@ -4,28 +4,15 @@ import Auth from './components/Auth';
 import Greeting from './components/Greeting';
 import EntryForm from './components/EntryForm';
 import EntryList from './components/EntryList';
+import Stats from './components/Stats';
 
 function App() {
   const [session, setSession] = useState(null);
   const [entries, setEntries] = useState([]);
-  const [entryToEdit, setEntryToEdit] = useState(null); // <--- New State: Tracks what we are editing
+  const [entryToEdit, setEntryToEdit] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchEntries();
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchEntries();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
+  // --- 1. DEFINE THIS FUNCTION FIRST ---
   const fetchEntries = async () => {
     const { data, error } = await supabase
       .from('entries')
@@ -36,14 +23,29 @@ function App() {
     else setEntries(data);
   };
 
+  // --- 2. NOW USE IT IN USEEFFECT ---
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) fetchEntries();
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) fetchEntries();
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // --- 3. REST OF YOUR FUNCTIONS ---
   const addEntry = async (formData) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("You must be logged in");
 
     const { error } = await supabase
       .from('entries')
-      .insert([
-        {
+      .insert([{
           user_id: user.id,
           title: formData.title,
           kind: formData.kind,
@@ -52,14 +54,16 @@ function App() {
           rating: formData.rating,           
           reflection: formData.reflection,   
           status: 'past'
-        }
-      ]);
+      }]);
 
-    if (error) alert(error.message);
-    else fetchEntries();
+    if (error) {
+      alert(error.message);
+    } else {
+      fetchEntries();
+      setShowForm(false);
+    }
   };
 
-  // --- NEW: UPDATE FUNCTION (UPDATE) ---
   const updateEntry = async (id, formData) => {
     const { error } = await supabase
       .from('entries')
@@ -71,13 +75,14 @@ function App() {
         rating: formData.rating,
         reflection: formData.reflection
       })
-      .eq('id', id); // Must match the ID!
+      .eq('id', id);
 
     if (error) {
       alert(error.message);
     } else {
-      fetchEntries(); // Refresh the list
-      // Note: The form handles resetting the state via the prop we pass down
+      fetchEntries();
+      setShowForm(false);
+      setEntryToEdit(null);
     }
   };
 
@@ -86,6 +91,12 @@ function App() {
     const { error } = await supabase.from('entries').delete().eq('id', id);
     if (error) alert(error.message);
     else fetchEntries();
+  };
+
+  const handleEditClick = (entry) => {
+    setEntryToEdit(entry);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (!session) return <Auth />;
@@ -102,19 +113,44 @@ function App() {
       <main>
         <Greeting />
         
-        {/* Pass all the props needed for editing */}
-        <EntryForm 
-          onAddEntry={addEntry} 
-          onUpdateEntry={updateEntry}
-          entryToEdit={entryToEdit}
-          setEntryToEdit={setEntryToEdit}
-        />
+        {/* Make sure to uncomment this now that the file exists! */}
+        <Stats entries={entries} />
+
+        <button 
+          onClick={() => {
+            setShowForm(!showForm);
+            setEntryToEdit(null);
+          }}
+          style={{
+            width: "100%",
+            padding: "15px",
+            backgroundColor: showForm ? "#eee" : "#222",
+            color: showForm ? "#333" : "#fff",
+            border: "none",
+            borderRadius: "8px",
+            fontSize: "16px",
+            cursor: "pointer",
+            marginBottom: "20px",
+            fontWeight: "bold",
+            transition: "all 0.2s"
+          }}
+        >
+          {showForm ? "Cancel / Close Form" : "+ Log New Entry"}
+        </button>
         
-        {/* Pass the function to trigger edit mode */}
+        {showForm && (
+          <EntryForm 
+            onAddEntry={addEntry} 
+            onUpdateEntry={updateEntry}
+            entryToEdit={entryToEdit}
+            setEntryToEdit={setEntryToEdit}
+          />
+        )}
+        
         <EntryList 
           entries={entries} 
           onDelete={deleteEntry} 
-          onEdit={setEntryToEdit} // When clicked, this sets the state!
+          onEdit={handleEditClick} 
         />
       </main>
     </div>
