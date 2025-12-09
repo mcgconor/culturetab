@@ -13,9 +13,9 @@ function App() {
   const [session, setSession] = useState(null);
   
   // DATA STATES
-  const [entries, setEntries] = useState([]);       // The visible list (paginated)
-  const [statsData, setStatsData] = useState([]);   // <--- NEW: The full list (for Stats widget only)
-  const [totalResults, setTotalResults] = useState(0); // <--- NEW: Total count for current filter
+  const [entries, setEntries] = useState([]);      
+  const [statsData, setStatsData] = useState([]);   
+  const [totalResults, setTotalResults] = useState(0); 
 
   // UI STATES
   const [entryToEdit, setEntryToEdit] = useState(null);
@@ -30,9 +30,8 @@ function App() {
     search: ''
   });
 
-  // --- 1. FETCH GLOBAL STATS (The "Big Picture") ---
+  // --- 1. FETCH GLOBAL STATS ---
   const fetchStats = async () => {
-    // We only select 'kind' to keep this super fast and lightweight
     const { data, error } = await supabase
       .from('entries')
       .select('kind'); 
@@ -40,7 +39,7 @@ function App() {
     if (!error) setStatsData(data);
   };
 
-  // --- 2. FETCH LIST (With Search Logic) ---
+  // --- 2. FETCH LIST ---
   const fetchEntries = async (pageNumber = 0, currentFilters = filters) => {
     const from = pageNumber * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
@@ -49,26 +48,22 @@ function App() {
       .from('entries')
       .select('*', { count: 'exact' });
 
-    // 1. Apply Search (Title OR Creator)
+    // Apply Search
     if (currentFilters.search && currentFilters.search.trim() !== '') {
       const term = currentFilters.search.trim();
-      // .ilike means "case-insensitive like"
-      // This says: Match title OR match creator
       query = query.or(`title.ilike.%${term}%,creator.ilike.%${term}%`);
     }
 
-    // 2. Apply Type Filter
+    // Apply Filters
     if (currentFilters.kind !== 'all') query = query.eq('kind', currentFilters.kind);
-    
-    // 3. Apply Rating Filter
     if (currentFilters.rating !== 'all') query = query.gte('rating', parseInt(currentFilters.rating));
 
-    // 4. Apply Sort
+    // Apply Sort
     if (currentFilters.sort === 'newest') query = query.order('event_date', { ascending: false });
     else if (currentFilters.sort === 'oldest') query = query.order('event_date', { ascending: true });
     else if (currentFilters.sort === 'highest') query = query.order('rating', { ascending: false });
 
-    // 5. Execute
+    // Execute
     const { data, count, error } = await query.range(from, to);
     
     if (error) {
@@ -91,16 +86,13 @@ function App() {
   };
 
   // --- EFFECTS ---
-  
-  // On Login: Fetch everything
   useEffect(() => {
     if (session) {
       fetchEntries(0, filters);
-      fetchStats(); // <--- Update stats on load
+      fetchStats(); 
     }
   }, [session]);
 
-  // On Filter Change: Reset list, keep stats same
   useEffect(() => {
     if (session) {
       setPage(0);
@@ -109,7 +101,6 @@ function App() {
     }
   }, [filters]);
 
-  // Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -117,8 +108,7 @@ function App() {
   }, []);
 
 
-  // --- CRUD WRAPPERS (Now updating Stats too) ---
-  
+  // --- CRUD WRAPPERS ---
   const addEntry = async (formData) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("You must be logged in");
@@ -128,7 +118,7 @@ function App() {
     if (error) alert(error.message);
     else {
       fetchEntries(0);
-      fetchStats(); // <--- Refresh stats
+      fetchStats();
       setShowForm(false);
     }
   };
@@ -138,7 +128,7 @@ function App() {
     if (error) alert(error.message);
     else {
       fetchEntries(0);
-      fetchStats(); // <--- Refresh stats (in case category changed)
+      fetchStats();
       setShowForm(false);
       setEntryToEdit(null);
     }
@@ -150,7 +140,7 @@ function App() {
     if (error) alert(error.message);
     else {
       fetchEntries(0);
-      fetchStats(); // <--- Refresh stats
+      fetchStats();
     }
   };
 
@@ -180,7 +170,6 @@ function App() {
       <main>
         <Greeting />
         
-        {/* Pass the separate "Stats Data" so it's always accurate */}
         <Stats entries={statsData} />
 
         <button 
@@ -205,29 +194,31 @@ function App() {
         
         <Filters filters={filters} setFilters={setFilters} />
         
-        {/* --- NEW: Results Counter --- */}
-        <div style={{ fontSize: "14px", color: "#666", marginBottom: "10px", fontStyle: "italic" }}>
-          {totalResults === 0 ? "No entries found." : `Showing ${entries.length} of ${totalResults} entries`}
+        {/* --- STABILIZER WRAPPER (This was the tricky part) --- */}
+        <div style={{ minHeight: "60vh" }}>
+          <div style={{ fontSize: "14px", color: "#666", marginBottom: "10px", fontStyle: "italic" }}>
+            {totalResults === 0 ? "No entries found." : `Showing ${entries.length} of ${totalResults} entries`}
+          </div>
+
+          <EntryList 
+            entries={entries} 
+            onDelete={deleteEntry} 
+            onEdit={handleEditClick} 
+          />
+
+          {hasMore && (
+            <button 
+              onClick={loadMore}
+              style={{
+                display: "block", width: "100%", margin: "20px auto", padding: "12px",
+                backgroundColor: "white", border: "1px solid #ccc", borderRadius: "8px",
+                cursor: "pointer", color: "#555"
+              }}
+            >
+              Load More ↓
+            </button>
+          )}
         </div>
-
-        <EntryList 
-          entries={entries} 
-          onDelete={deleteEntry} 
-          onEdit={handleEditClick} 
-        />
-
-        {hasMore && (
-          <button 
-            onClick={loadMore}
-            style={{
-              display: "block", width: "100%", margin: "20px auto", padding: "12px",
-              backgroundColor: "white", border: "1px solid #ccc", borderRadius: "8px",
-              cursor: "pointer", color: "#555"
-            }}
-          >
-            Load More ↓
-          </button>
-        )}
       </main>
     </div>
   );
