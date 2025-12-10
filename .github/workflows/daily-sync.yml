@@ -1,0 +1,37 @@
+name: Daily Event Sync
+
+# Trigger:
+# 1. Automatically at 4:00 AM UTC every day
+# 2. Manually (so you can click a button to test it)
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync-events:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Download your code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Install Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      # 3. Install the libraries (Supabase, Dotenv)
+      - name: Install dependencies
+        run: npm install
+
+      # 4. Run the Sync Script
+      - name: Run Sync Script
+        run: node sync.js
+        env:
+          # Pass the secrets we saved in Step 1
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TICKETMASTER_KEY: ${{ secrets.VITE_TICKETMASTER_KEY }}
