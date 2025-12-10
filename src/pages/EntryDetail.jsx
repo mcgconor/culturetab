@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import EntryForm from '../components/EntryForm';
 import StarRating from '../components/StarRating';
-import EntryForm from '../components/EntryForm'; // <--- Import the form
 
-// Re-using the color map
 const typeColors = {
   book: "bg-blue-100 text-blue-700 border-blue-200",
   film: "bg-red-100 text-red-700 border-red-200",
@@ -14,13 +13,20 @@ const typeColors = {
   default: "bg-gray-100 text-gray-700 border-gray-200"
 };
 
+// --- PREFIX MAPPING ---
+const creatorPrefixes = {
+  book: "Written by",
+  film: "Directed by",
+  default: "by"
+};
+
 export default function EntryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false); // <--- State to toggle view
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     fetchEntry();
@@ -38,27 +44,19 @@ export default function EntryDetail() {
     setLoading(false);
   };
 
-  // --- DELETE LOGIC ---
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this entry? This cannot be undone.")) return;
-
     const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (error) {
-      alert(error.message);
-    } else {
-      // Redirect back to home after deletion
-      navigate('/', { replace: true });
-    }
+    if (error) alert(error.message);
+    else navigate('/', { replace: true });
   };
 
-  // --- UPDATE LOGIC ---
   const handleUpdate = async (id, formData) => {
     const { error } = await supabase.from('entries').update(formData).eq('id', id);
-    if (error) {
-      alert(error.message);
-    } else {
-      await fetchEntry(); // Refresh local data
-      setIsEditing(false); // Switch back to "View Mode"
+    if (error) alert(error.message);
+    else {
+      await fetchEntry();
+      setIsEditing(false);
     }
   };
 
@@ -74,11 +72,12 @@ export default function EntryDetail() {
   if (!entry) return <div className="p-10 text-center">Entry not found.</div>;
 
   const badgeColor = typeColors[entry.kind] || typeColors.default;
+  // Get prefix
+  const prefix = creatorPrefixes[entry.kind] || creatorPrefixes.default;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       
-      {/* Back Button */}
       <div className="max-w-3xl mx-auto mb-6">
         <button 
           onClick={() => navigate(-1)} 
@@ -88,41 +87,29 @@ export default function EntryDetail() {
         </button>
       </div>
 
-      {/* CONDITIONAL RENDER: Edit Form OR View Card */}
       {isEditing ? (
         <div className="max-w-3xl mx-auto">
-           {/* Reuse existing form, pass the current entry as "entryToEdit" */}
           <EntryForm 
             entryToEdit={entry} 
             onUpdateEntry={handleUpdate}
-            // Detail page uses a different state variable (setIsEditing)
             onCancel={() => setIsEditing(false)} 
           />
         </div>
       ) : (
         <article className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           
-          {/* HEADER SECTION */}
           <div className="p-8 border-b border-gray-100 bg-white">
             
-            {/* Top Row: Badge + Actions */}
             <div className="flex justify-between items-start mb-6">
               <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${badgeColor}`}>
                 {entry.kind}
               </span>
 
-              {/* ACTION BUTTONS */}
               <div className="flex gap-4">
-                <button 
-                  onClick={() => setIsEditing(true)}
-                  className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors"
-                >
+                <button onClick={() => setIsEditing(true)} className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors">
                   Edit
                 </button>
-                <button 
-                  onClick={handleDelete}
-                  className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors"
-                >
+                <button onClick={handleDelete} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors">
                   Delete
                 </button>
               </div>
@@ -134,16 +121,22 @@ export default function EntryDetail() {
             
             {entry.creator && (
               <p className="text-xl text-gray-500 font-medium">
-                by {entry.creator}
+                {prefix} {entry.creator}
               </p>
             )}
 
-            <div className="mt-6">
-  <StarRating rating={entry.rating} />
-</div>
+            <div className="mt-6 flex justify-between items-end">
+              <div className="mt-6">
+                <StarRating rating={entry.rating} />
+              </div>
+              <span className="text-sm font-medium text-gray-400">
+                {new Date(entry.event_date).toLocaleDateString(undefined, { 
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                })}
+              </span>
+            </div>
           </div>
 
-          {/* NOTES SECTION */}
           <div className="p-8 bg-gray-50/50 min-h-[300px]">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
               Personal Reflection
@@ -160,7 +153,6 @@ export default function EntryDetail() {
         </article>
       )}
 
-      {/* Footer Meta */}
       {!isEditing && (
         <div className="max-w-3xl mx-auto mt-6 text-center text-xs text-gray-400">
           Entry logged on {new Date(entry.created_at).toLocaleString()}

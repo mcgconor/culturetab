@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import StarRating from './StarRating'; // <--- 1. IMPORT
+import StarRating from './StarRating';
 
 const typeColors = {
   book: "bg-blue-100 text-blue-700 border-blue-200",
@@ -10,6 +10,13 @@ const typeColors = {
   default: "bg-gray-100 text-gray-700 border-gray-200"
 };
 
+// --- PREFIX MAPPING ---
+const creatorPrefixes = {
+  book: "Written by",
+  film: "Directed by",
+  default: "by"
+};
+
 export default function EntryList({ entries, onDelete, onEdit }) {
   if (!entries || entries.length === 0) return null;
 
@@ -18,20 +25,19 @@ export default function EntryList({ entries, onDelete, onEdit }) {
       {entries.map((entry) => {
         const badgeColor = typeColors[entry.kind] || typeColors.default;
         
+        // Determine the prefix (e.g. "Directed by")
+        const prefix = creatorPrefixes[entry.kind] || creatorPrefixes.default;
+        
         return (
           <div key={entry.id} className="group bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
             
-            {/* ROW 1: Badge + Rating */}
             <div className="flex items-center justify-between mb-3">
               <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${badgeColor}`}>
                 {entry.kind}
               </span>
-              
-              {/* 2. USE THE NEW COMPONENT */}
               <StarRating rating={entry.rating} /> 
             </div>
 
-            {/* ROW 2: Title & Creator */}
             <div className="mb-4">
               <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
                 <Link to={`/entry/${entry.id}`} className="hover:text-blue-600 transition-colors">
@@ -40,12 +46,11 @@ export default function EntryList({ entries, onDelete, onEdit }) {
               </h3>
               {entry.creator && (
                 <p className="text-sm text-gray-500">
-                  by <span className="font-medium text-gray-700">{entry.creator}</span>
+                  {prefix} <span className="font-medium text-gray-700">{entry.creator}</span>
                 </p>
               )}
             </div>
 
-            {/* ROW 3: Date & Actions */}
             <div className="flex items-center justify-between pt-4 border-t border-gray-100">
               <span className="text-xs font-medium text-gray-400">
                 Logged {new Date(entry.event_date).toLocaleDateString()}
