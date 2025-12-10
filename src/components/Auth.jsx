@@ -46,8 +46,9 @@ export default function Auth() {
       
       {/* 1. HERO SECTION */}
       <div className="text-center mb-10 animate-fade-in-down">
+        {/* Updated Font Weight and Tracking */}
         <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
-          Start your Culture Log.
+          Start your CultureLog.
         </h1>
         <p className="text-xl text-gray-500 mb-8">
           Track the books, films, and art that matter to you. <br/>

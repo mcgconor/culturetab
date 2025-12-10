@@ -5,12 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 export default function Events() {
   const navigate = useNavigate();
   
-  // RAW DATA (The full list from DB)
   const [allEvents, setAllEvents] = useState([]);
-  
-  // FILTERED DATA (What user sees)
   const [visibleEvents, setVisibleEvents] = useState([]);
-  
   const [loading, setLoading] = useState(true);
 
   // FILTERS
@@ -19,7 +15,7 @@ export default function Events() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // 1. INITIAL FETCH (Get everything upcoming)
+  // 1. INITIAL FETCH
   useEffect(() => {
     const fetchAllEvents = async () => {
       setLoading(true);
@@ -27,14 +23,14 @@ export default function Events() {
         const { data, error } = await supabase
           .from('public_events')
           .select('*')
-          .gte('start_date', new Date().toISOString()) // Only future events
+          .gte('start_date', new Date().toISOString())
           .order('start_date', { ascending: true })
-          .limit(500); // Grab next 500 events (plenty for now)
+          .limit(500);
 
         if (error) throw error;
         
         setAllEvents(data);
-        setVisibleEvents(data); // Show all initially
+        setVisibleEvents(data); 
       } catch (error) {
         console.error('Error fetching events:', error);
       } finally {
@@ -45,11 +41,10 @@ export default function Events() {
     fetchAllEvents();
   }, []);
 
-  // 2. INSTANT FILTERING (Runs whenever inputs change)
+  // 2. INSTANT FILTERING
   useEffect(() => {
     let result = allEvents;
 
-    // A. Search (Title or Venue)
     if (keyword) {
       const q = keyword.toLowerCase();
       result = result.filter(e => 
@@ -57,18 +52,13 @@ export default function Events() {
         (e.venue && e.venue.toLowerCase().includes(q))
       );
     }
-
-    // B. Category
     if (category) {
       result = result.filter(e => e.category === category);
     }
-
-    // C. Date Range
     if (startDate) {
       result = result.filter(e => e.start_date >= startDate);
     }
     if (endDate) {
-      // Add end of day time
       result = result.filter(e => e.start_date <= `${endDate}T23:59:59`);
     }
 
@@ -82,15 +72,15 @@ export default function Events() {
     setEndDate('');
   };
 
-  // COMMON STYLES
-  const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400";
+  // COMMON STYLES (Strict h-12 enforcement)
+  const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
   const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 min-h-screen animate-fade-in">
       
       {/* HEADER */}
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <button 
           onClick={() => navigate('/')} 
           className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-2"
@@ -100,67 +90,77 @@ export default function Events() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">Dublin Calendar</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Dublin Calendar</h1>
         <p className="text-gray-500">Discover culture happening in your city.</p>
       </div>
 
-      {/* FILTER BAR */}
+      {/* FILTER BAR - REDESIGNED LAYOUT */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-8">
-        <div className="space-y-4">
+        <div className="space-y-5">
           
-          {/* Row 1 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2 relative">
-              <label className={labelClass}>Search</label>
-              <input 
-                type="text" 
-                placeholder="Search artist, venue..." 
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Category</label>
-              <select 
-                value={category} 
-                onChange={(e) => setCategory(e.target.value)}
-                className={`${inputClass} appearance-none cursor-pointer`}
-              >
-                <option value="">All Events</option>
-                <option value="music">Music</option>
-                <option value="arts">Arts & Theatre</option>
-                <option value="film">Film</option>
-              </select>
-            </div>
+          {/* ROW 1: SEARCH (Full Width) */}
+          <div>
+            <label className={labelClass}>Search</label>
+            <input 
+              type="text" 
+              placeholder="Search artist, venue..." 
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className={inputClass}
+            />
           </div>
 
-          {/* Row 2 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 items-end">
+          {/* ROW 2: FILTERS (Grid) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            
+            {/* Category */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className={labelClass}>Category</label>
+              <div className="relative">
+                <select 
+                  value={category} 
+                  onChange={(e) => setCategory(e.target.value)}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">All Types</option>
+                  <option value="music">Music</option>
+                  <option value="arts">Arts</option>
+                  <option value="film">Film</option>
+                </select>
+                {/* Custom Arrow because we used appearance-none */}
+                <div className="absolute right-4 top-4 pointer-events-none text-gray-400 text-xs">▼</div>
+              </div>
+            </div>
+
+            {/* From */}
             <div>
               <label className={labelClass}>From</label>
               <input 
                 type="date" 
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className={inputClass}
+                className={`${inputClass} px-2 sm:px-4`} // tighter padding on mobile
               />
             </div>
+
+            {/* To */}
             <div>
               <label className={labelClass}>To</label>
               <input 
                 type="date" 
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className={inputClass}
+                className={`${inputClass} px-2 sm:px-4`}
               />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+
+            {/* Reset Button */}
+            <div className="col-span-2 sm:col-span-1 flex items-end">
               <button 
                 onClick={handleReset}
-                className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-sm"
+                className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-xs uppercase tracking-wide"
               >
-                Reset Filters
+                Reset
               </button>
             </div>
           </div>

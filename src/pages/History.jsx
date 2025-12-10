@@ -34,7 +34,6 @@ export default function History() {
     setLoading(false);
   };
 
-  // Instant Client Filtering
   useEffect(() => {
     let result = entries;
 
@@ -67,14 +66,14 @@ export default function History() {
   };
 
   // COMMON STYLES
-  const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400";
+  const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
   const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 min-h-screen animate-fade-in">
       
-      {/* 1. TOP NAV */}
-      <div className="mb-6">
+      {/* HEADER */}
+      <div className="mb-6 flex justify-between items-center">
         <Link 
           to="/" 
           className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-2"
@@ -84,16 +83,16 @@ export default function History() {
       </div>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2">My History</h1>
+        <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">My History</h1>
         <p className="text-gray-500">All your logged culture entries.</p>
       </div>
 
-      {/* 2. FILTER BAR */}
+      {/* FILTER BAR - MATCHING EVENTS LAYOUT */}
       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-8">
-        
-        {/* Row 1: Search & Category */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <div className="sm:col-span-2">
+        <div className="space-y-5">
+          
+          {/* ROW 1: SEARCH (Full Width) */}
+          <div>
             <label className={labelClass}>Search</label>
             <input 
               type="text" 
@@ -103,56 +102,70 @@ export default function History() {
               className={inputClass}
             />
           </div>
-          <div>
-            <label className={labelClass}>Category</label>
-            <select 
-              value={category} 
-              onChange={(e) => setCategory(e.target.value)}
-              className={`${inputClass} appearance-none cursor-pointer`}
-            >
-              <option value="">All Categories</option>
-              <option value="book">Book</option>
-              <option value="film">Film</option>
-              <option value="concert">Concert</option>
-              <option value="theatre">Theatre</option>
-              <option value="exhibition">Exhibition</option>
-            </select>
+
+          {/* ROW 2: DROPDOWNS & ACTION */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            
+            {/* Category */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className={labelClass}>Category</label>
+              <div className="relative">
+                <select 
+                  value={category} 
+                  onChange={(e) => setCategory(e.target.value)}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">All Types</option>
+                  <option value="book">Book</option>
+                  <option value="film">Film</option>
+                  <option value="concert">Concert</option>
+                  <option value="theatre">Theatre</option>
+                  <option value="exhibition">Exhibition</option>
+                </select>
+                <div className="absolute right-4 top-4 pointer-events-none text-gray-400 text-xs">▼</div>
+              </div>
+            </div>
+
+            {/* Rating */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className={labelClass}>Rating</label>
+              <div className="relative">
+                <select 
+                  value={rating} 
+                  onChange={(e) => setRating(e.target.value)}
+                  className={`${inputClass} cursor-pointer`}
+                >
+                  <option value="">Any</option>
+                  <option value="5">5 Stars</option>
+                  <option value="4">4+ Stars</option>
+                  <option value="3">3+ Stars</option>
+                </select>
+                <div className="absolute right-4 top-4 pointer-events-none text-gray-400 text-xs">▼</div>
+              </div>
+            </div>
+
+            {/* Spacer for desktop alignment */}
+            <div className="hidden sm:block"></div>
+
+            {/* Reset Button */}
+            <div className="col-span-2 sm:col-span-1 flex items-end">
+               <button 
+                  onClick={handleReset}
+                  className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-xs uppercase tracking-wide"
+                >
+                  Reset
+                </button>
+            </div>
           </div>
         </div>
-
-        {/* Row 2: Rating & Actions */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 items-end">
-           <div>
-            <label className={labelClass}>Rating</label>
-            <select 
-              value={rating} 
-              onChange={(e) => setRating(e.target.value)}
-              className={`${inputClass} appearance-none cursor-pointer`}
-            >
-              <option value="">Any Rating</option>
-              <option value="5">★★★★★ (5)</option>
-              <option value="4">★★★★ (4+)</option>
-              <option value="3">★★★ (3+)</option>
-            </select>
-          </div>
-          
-          <div className="col-span-1">
-             <button 
-                onClick={handleReset}
-                type="button"
-                className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-sm"
-              >
-                Reset Filters
-              </button>
-          </div>
-          
-          <div className="hidden sm:flex justify-end items-center h-12 text-xs font-bold text-gray-400">
-             Found {filteredEntries.length} entries
-          </div>
+        
+        {/* Count */}
+        <div className="mt-4 pt-4 border-t border-gray-100 text-xs font-bold text-gray-400 text-right">
+           Found {filteredEntries.length} entries
         </div>
       </div>
 
-      {/* 3. ENTRIES LIST */}
+      {/* LIST */}
       {loading ? (
          <div className="text-center py-12 text-gray-400">Loading your history...</div>
       ) : filteredEntries.length === 0 ? (
