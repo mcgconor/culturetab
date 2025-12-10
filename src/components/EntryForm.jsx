@@ -6,8 +6,8 @@ import BookSearch from './BookSearch';
 export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCancel }) {
   const [formData, setFormData] = useState({
     title: '',
-    kind: 'book',
-    rating: 5,
+    kind: 'book', // Default
+    rating: 0,
     creator: '',
     reflection: '',
     event_date: new Date().toISOString().split('T')[0],
@@ -27,6 +27,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     } else {
       onAddEntry(formData);
     }
+    // Reset defaults
     setFormData({
       title: '', kind: 'book', rating: 5, creator: '', reflection: '',
       event_date: new Date().toISOString().split('T')[0], image_url: ''
@@ -60,7 +61,16 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     return 'Creator';
   };
 
-  // UNIFIED STYLES
+  // CATEGORY ICONS CONFIG
+  const categories = [
+    { id: 'book', label: 'Book', icon: '📖' },
+    { id: 'film', label: 'Film', icon: '🎬' },
+    { id: 'concert', label: 'Music', icon: '🎵' },
+    { id: 'theatre', label: 'Theatre', icon: '🎭' },
+    { id: 'exhibition', label: 'Art', icon: '🖼️' },
+  ];
+
+  // STYLES
   const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
   const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
 
@@ -73,9 +83,36 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
         </h2>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* ROW 1: TITLE (Full Width for max autocomplete space) */}
+        {/* ROW 1: CATEGORY SELECTION (Icon Bar) */}
+        <div>
+          <label className={labelClass}>Category</label>
+          <div className="grid grid-cols-5 gap-2">
+            {categories.map((cat) => {
+              const isActive = formData.kind === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, kind: cat.id })}
+                  className={`
+                    h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 border
+                    ${isActive 
+                      ? 'bg-black text-white border-black shadow-md transform scale-[1.02]' 
+                      : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100 hover:text-gray-600'
+                    }
+                  `}
+                >
+                  <span className="text-xl mb-0.5">{cat.icon}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider">{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ROW 2: TITLE (Context aware) */}
         <div>
           <label className={labelClass}>Title</label>
           {formData.kind === 'film' ? (
@@ -92,7 +129,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
             <input
               name="title"
               type="text"
-              placeholder="Title of work..."
+              placeholder={`Title of ${formData.kind}...`}
               value={formData.title}
               onChange={handleChange}
               className={inputClass}
@@ -102,21 +139,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           )}
         </div>
 
-        {/* ROW 2: CATEGORY + DATE (Stacked on Mobile, Side-by-Side on Desktop) */}
+        {/* ROW 3: DATE + RATING */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="relative">
-            <label className={labelClass}>Category</label>
-            <select name="kind" value={formData.kind} onChange={handleChange} className={`${inputClass} cursor-pointer`}>
-              <option value="book">Book</option>
-              <option value="film">Film</option>
-              <option value="concert">Concert</option>
-              <option value="theatre">Theatre</option>
-              <option value="exhibition">Exhibition</option>
-            </select>
-             {/* Custom Arrow */}
-             <div className="absolute right-4 top-[34px] pointer-events-none text-gray-400 text-xs">▼</div>
-          </div>
-          
           <div>
             <label className={labelClass}>Date Experienced</label>
             <input 
@@ -128,35 +152,42 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               required 
             />
           </div>
-        </div>
-
-        {/* ROW 3: CREATOR + RATING */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className={labelClass}>{getCreatorLabel(formData.kind)}</label>
-            <input 
-              name="creator" 
-              type="text" 
-              placeholder={formData.kind === 'book' ? 'Auto-filled from search...' : 'Name'}
-              value={formData.creator || ''} 
-              onChange={handleChange} 
-              className={inputClass} 
-            />
-          </div>
           
           <div>
             <label className={labelClass}>Rating</label>
-            <div className="h-12 flex items-center bg-gray-50 border border-gray-200 rounded-xl px-4">
+            <div className="h-12 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-xl px-2">
               <StarRatingInput value={formData.rating} onChange={handleRatingChange} />
             </div>
           </div>
         </div>
 
-        {/* IMAGE PREVIEW (If exists) */}
+        {/* ROW 4: CREATOR (Full Width) */}
+        <div>
+          <label className={labelClass}>{getCreatorLabel(formData.kind)}</label>
+          <input 
+            name="creator" 
+            type="text" 
+            placeholder={formData.kind === 'book' ? 'Auto-filled from search...' : 'Name'}
+            value={formData.creator || ''} 
+            onChange={handleChange} 
+            className={inputClass} 
+          />
+        </div>
+
+        {/* IMAGE PREVIEW */}
         {formData.image_url && (
-           <div className="flex gap-4 items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+           <div className="flex gap-4 items-center bg-gray-50 p-3 rounded-xl border border-gray-100 animate-fade-in">
               <img src={formData.image_url} alt="Cover" className="w-10 h-14 object-cover rounded shadow-sm" />
-              <span className="text-xs font-bold text-gray-500">Cover Image Selected</span>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-gray-900">Cover Image Found</span>
+                <button 
+                  type="button" 
+                  onClick={() => setFormData({...formData, image_url: ''})}
+                  className="text-[10px] text-red-500 font-bold text-left hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
            </div>
         )}
 
@@ -165,10 +196,10 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           <label className={labelClass}>Reflection</label>
           <textarea 
             name="reflection" 
-            placeholder="What did you think? (Optional)" 
+            placeholder="Thoughts, memories, quotes..." 
             value={formData.reflection || ''} 
             onChange={handleChange} 
-            className={`${inputClass} h-32 py-3 min-h-[120px] resize-y`} 
+            className={`${inputClass} h-32 py-3 min-h-[120px] resize-y leading-relaxed`} 
           />
         </div>
 
