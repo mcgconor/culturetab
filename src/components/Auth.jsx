@@ -1,109 +1,149 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import EntryForm from './EntryForm';
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false); // <--- New State
+  const [submitted, setSubmitted] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // NEW: Toggle to show/hide the guest form
+  const [showGuestForm, setShowGuestForm] = useState(false); 
+  
+  const [pendingData, setPendingData] = useState(null);
 
-  const handleLogin = async (e) => {
+  const handleMagicLink = async (e) => {
     e.preventDefault();
     setLoading(true);
     
+    if (pendingData) {
+      localStorage.setItem('pendingEntry', JSON.stringify(pendingData));
+    }
+
     const { error } = await supabase.auth.signInWithOtp({ 
       email,
-      options: {
-        emailRedirectTo: window.location.origin 
-      }
+      options: { emailRedirectTo: window.location.origin }
     });
 
     if (error) {
       alert(error.message);
       setLoading(false);
     } else {
-      setSubmitted(true); // Switch to "Check Inbox" view
+      setSubmitted(true);
       setLoading(false);
     }
   };
 
-  return (
-    <div className="flex flex-col items-center justify-center py-20 px-4 bg-white">
-      
-      {/* HERO SECTION */}
-      <div className="text-center max-w-2xl mb-12">
-        <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-6">
-          Your Personal <br/>
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Culture Log.</span>
-        </h1>
-        <p className="text-xl text-gray-500 leading-relaxed">
-          Stop forgetting the books you read and the films you watch. 
-          CultureTab is the minimalist journal for your intellectual diet.
-        </p>
-      </div>
+  const handleGuestSubmit = (formData) => {
+    setPendingData(formData);
+    setShowLoginModal(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-      {/* CARD CONTAINER */}
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-        
-        {submitted ? (
-          // STATE 2: CHECK EMAIL
-          <div className="text-center animate-fade-in-down">
-            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
-              ✉️
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your inbox</h2>
-            <p className="text-gray-500 mb-6">
-              We sent a magic link to <br/>
-              <span className="font-bold text-gray-800">{email}</span>
-            </p>
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-12">
+      
+      {/* 1. HERO SECTION */}
+      <div className="text-center mb-10 animate-fade-in-down">
+        <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
+          Start your Culture Log.
+        </h1>
+        <p className="text-xl text-gray-500 mb-8">
+          Track the books, films, and art that matter to you. <br/>
+          <span className="font-bold text-gray-900">Try it now — no account needed yet.</span>
+        </p>
+
+        {/* THE TRIGGER BUTTON (Only visible if form is hidden) */}
+        {!showGuestForm && (
+          <div className="space-y-4">
+            <button 
+              onClick={() => setShowGuestForm(true)}
+              className="bg-black text-white text-lg font-bold py-4 px-8 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all shadow-lg hover:shadow-xl"
+            >
+              + Log New Entry
+            </button>
             
-            <div className="pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400 mb-2">Did you type the wrong email?</p>
+            <div className="pt-2">
               <button 
-                onClick={() => setSubmitted(false)}
-                className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                onClick={() => setShowLoginModal(true)}
+                className="text-sm font-bold text-gray-400 hover:text-black transition-colors"
               >
-                ← Try a different email
+                Already have an account? Sign in
               </button>
             </div>
           </div>
-        ) : (
-          // STATE 1: LOGIN FORM
-          <div className="space-y-6">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
-                Sign in / Sign up
-              </label>
-              <input
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin(e)}
-                className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-lg text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200"
-              />
-            </div>
-            
-            <button 
-              onClick={handleLogin} 
-              disabled={loading || !email} 
-              className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Sending link...' : 'Send Magic Link →'}
-            </button>
-
-            <p className="text-center text-xs text-gray-400 mt-4">
-              No password required. We'll email you a secure link.
-            </p>
-          </div>
         )}
-
-      </div>
-      
-      {/* SOCIAL PROOF / EXTRA INFO (Optional) */}
-      <div className="mt-12 flex gap-8 text-gray-400 grayscale opacity-50">
-        {/* Placeholder for simple icons if you wanted "As seen on..." styles */}
       </div>
 
+      {/* 2. THE GUEST FORM (Slides down when active) */}
+      {showGuestForm && !submitted && !showLoginModal && (
+        <div className="animate-fade-in-down">
+          <EntryForm 
+            onAddEntry={handleGuestSubmit} 
+            onCancel={() => setShowGuestForm(false)} // Close form on cancel
+          />
+        </div>
+      )}
+
+      {/* 3. THE LOGIN / SAVE MODAL */}
+      {(showLoginModal || submitted) && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            
+            {submitted ? (
+              <div className="text-center">
+                <div className="text-4xl mb-4">✉️</div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your inbox</h2>
+                <p className="text-gray-500 mb-6">
+                  We sent a magic link to <strong>{email}</strong>.
+                  <br/>Click it to save your entry!
+                </p>
+                <button onClick={() => setSubmitted(false)} className="text-blue-600 font-bold text-sm">
+                  Try different email
+                </button>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  {pendingData ? 'Save your entry' : 'Welcome back'}
+                </h2>
+                <p className="text-gray-500 mb-6">
+                  {pendingData 
+                    ? `Enter your email to save "${pendingData.title}" and create your account.` 
+                    : 'Enter your email to sign in.'}
+                </p>
+
+                <form onSubmit={handleMagicLink} className="space-y-4">
+                  <input
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-black transition-colors"
+                    autoFocus
+                    required
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full bg-black text-white font-bold py-3 rounded-xl hover:bg-gray-800 transition-transform active:scale-[0.98]"
+                  >
+                    {loading ? 'Sending...' : pendingData ? 'Save Entry & Sign In' : 'Send Magic Link'}
+                  </button>
+                </form>
+
+                <button 
+                  onClick={() => setShowLoginModal(false)}
+                  className="w-full mt-4 text-xs font-bold text-gray-400 hover:text-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

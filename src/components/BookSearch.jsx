@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // **PASTE YOUR GOOGLE API KEY HERE**
-const GOOGLE_BOOKS_KEY = 'YOUR_GOOGLE_API_KEY_HERE';
+const GOOGLE_BOOKS_KEY = 'AIzaSyAl-aPcpqmbawaYQurLCjK_SvSGTRPDfVY';
 
 export default function BookSearch({ initialTitle = '', onSelectBook }) {
   const [query, setQuery] = useState(initialTitle);
@@ -21,7 +21,7 @@ export default function BookSearch({ initialTitle = '', onSelectBook }) {
     }
     setLoading(true);
 
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&key=${GOOGLE_BOOKS_KEY}&maxResults=5`;
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&key=${'AIzaSyAl-aPcpqmbawaYQurLCjK_SvSGTRPDfVY'}&maxResults=5`;
     
     try {
       const response = await fetch(url);

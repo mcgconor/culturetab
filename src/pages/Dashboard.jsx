@@ -32,6 +32,43 @@ export default function Dashboard({ session }) {
     fetchStats(); 
   }, [fetchRecent, fetchStats]);
 
+  // NEW: Check for "Ghost Entries" from the public homepage
+  useEffect(() => {
+    const processPendingEntry = async () => {
+      const pendingStr = localStorage.getItem('pendingEntry');
+      
+      if (pendingStr) {
+        try {
+          const pendingData = JSON.parse(pendingStr);
+          
+          // 1. Insert into Supabase
+          const { error } = await supabase.from('entries').insert([{
+            user_id: session.user.id,
+            ...pendingData,
+            status: 'past'
+          }]);
+
+          if (error) {
+            console.error('Failed to save pending entry:', error);
+            alert('We tried to save your pending entry but something went wrong.');
+          } else {
+            // 2. Success! Refresh the list and clear storage
+            fetchRecent();
+            fetchStats();
+            // Optional: Show a nice "Saved!" toast here
+          }
+        } catch (err) {
+          console.error('Error parsing pending entry', err);
+        } finally {
+          // 3. Always clear the storage so we don't duplicate it next refresh
+          localStorage.removeItem('pendingEntry');
+        }
+      }
+    };
+
+    processPendingEntry();
+  }, [session, fetchRecent, fetchStats]); // Runs once when session is ready
+
   const addEntry = async (formData) => {
     const { error } = await supabase.from('entries').insert([{ user_id: session.user.id, ...formData, status: 'past' }]);
     if (error) alert(error.message);
