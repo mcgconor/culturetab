@@ -64,7 +64,7 @@ export default function EntryList({ entries, onDelete, onEdit }) {
                   {entry.creator}
                 </p>
 
-                {/* PILL & DATE */}
+                {/* PILL & DATE (Restored) */}
                 <div className="flex items-center gap-3">
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide ${getCategoryColor(entry.kind)}`}>
                     {entry.kind}
@@ -76,7 +76,7 @@ export default function EntryList({ entries, onDelete, onEdit }) {
               </div>
 
               {/* ACTION BUTTONS */}
-              {/* Desktop: Normal size. Mobile: Tiny size text-[10px] */}
+              {/* CHANGE: Added 'text-[10px]' for mobile to make them tiny and neat */}
               <div className="flex justify-end gap-3 mt-3 border-t border-gray-50 pt-2 sm:border-none sm:pt-0">
                 <button 
                   onClick={() => onEdit(entry)}
