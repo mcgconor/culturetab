@@ -1,81 +1,77 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'; // <--- Added Navigate
 import { supabase } from './supabaseClient';
-
-// Components
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import Auth from './components/Auth';
 
 // Pages
-import Dashboard from './pages/Dashboard';     
-import EntryDetail from './pages/EntryDetail'; 
-import History from './pages/History';
+import Auth from './components/Auth';
+import Dashboard from './pages/Dashboard';
+import History from './pages/History'; 
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Contact from './pages/Contact';
-import NotFound from './pages/NotFound';
 import Events from './pages/Events';
 import PublicEventDetail from './pages/PublicEventDetail';
+import EntryDetail from './pages/EntryDetail'; // <--- Imported exactly once
 
-function App() {
+export default function App() {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true); // <--- Add loading state to prevent flash
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) return null; // Prevent flickering while checking session
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400">Loading CultureTab...</div>;
+  }
 
   return (
     <Router>
-      <div className="min-h-screen flex flex-col font-sans text-gray-900 bg-white">
-        
+      <div className="flex flex-col min-h-screen bg-white font-sans text-gray-900">
         <Navbar session={session} />
         
-        <div className="flex-grow">
+        <main className="flex-grow">
           <Routes>
-            {/* PUBLIC PAGES (Accessible by everyone) */}
+            {/* PUBLIC ROUTES */}
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            
+            {/* PUBLIC EVENT CALENDAR (Ticketmaster/Supabase) */}
             <Route path="/events" element={<Events />} />
             <Route path="/event/:id" element={<PublicEventDetail />} />
 
-            {/* THE SPLIT HOME PAGE */}
-            {/* If logged in -> Dashboard. If logged out -> Auth Landing Page */}
-            <Route path="/" element={!session ? <Auth /> : <Dashboard session={session} />} />
-
-            {/* PROTECTED PAGES (Only if logged in, otherwise bounce to Home) */}
-            <Route 
-              path="/history" 
-              element={session ? <History session={session} /> : <Navigate to="/" />} 
-            /> 
-            <Route 
-              path="/entry/:id" 
-              element={session ? <EntryDetail /> : <Navigate to="/" />} 
-            />
-            {/* CATCH ALL (Must be at the very bottom) */}
-            <Route path="*" element={<NotFound />} />
+            {/* AUTH ROUTES */}
+            {!session ? (
+              <Route path="*" element={<Auth />} />
+            ) : (
+              <>
+                <Route path="/" element={<Dashboard session={session} />} />
+                <Route path="/history" element={<History />} />
+                
+                {/* PRIVATE ENTRY DETAIL (Your Log) */}
+                <Route path="/entry/:id" element={<EntryDetail />} />
+                
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </>
+            )}
           </Routes>
-        </div>
+        </main>
 
         <Footer />
-        
       </div>
     </Router>
   );
 }
-
-export default App;
