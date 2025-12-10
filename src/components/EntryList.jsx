@@ -10,7 +10,6 @@ const typeColors = {
   default: "bg-gray-100 text-gray-700 border-gray-200"
 };
 
-// --- PREFIX MAPPING ---
 const creatorPrefixes = {
   book: "Written by",
   film: "Directed by",
@@ -24,47 +23,66 @@ export default function EntryList({ entries, onDelete, onEdit }) {
     <div className="space-y-4">
       {entries.map((entry) => {
         const badgeColor = typeColors[entry.kind] || typeColors.default;
-        
-        // Determine the prefix (e.g. "Directed by")
         const prefix = creatorPrefixes[entry.kind] || creatorPrefixes.default;
         
         return (
-          <div key={entry.id} className="group bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+          <div 
+            key={entry.id} 
+            className="group bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 flex gap-4"
+          >
             
-            <div className="flex items-center justify-between mb-3">
-              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${badgeColor}`}>
-                {entry.kind}
-              </span>
-              <StarRating rating={entry.rating} /> 
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
-                <Link to={`/entry/${entry.id}`} className="hover:text-blue-600 transition-colors">
-                  {entry.title}
-                </Link>
-              </h3>
-              {entry.creator && (
-                <p className="text-sm text-gray-500">
-                  {prefix} <span className="font-medium text-gray-700">{entry.creator}</span>
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-              <span className="text-xs font-medium text-gray-400">
-                Logged {new Date(entry.event_date).toLocaleDateString()}
-              </span>
+            {/* NEW: IMAGE COLUMN (Fixed width for consistency) */}
+            {entry.image_url && (
+              <div className="flex-shrink-0 w-16 h-24">
+                <img 
+                  src={entry.image_url} 
+                  alt={entry.title} 
+                  className="w-full h-full object-cover rounded shadow-md"
+                />
+              </div>
+            )}
+            
+            {/* CONTENT COLUMN */}
+            <div className="flex-grow">
               
-              <div className="flex gap-4">
-                {onEdit && (
-                  <button onClick={() => onEdit(entry)} className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors">
-                    Edit
-                  </button>
+              {/* ROW 1: Badge + Rating */}
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${badgeColor}`}>
+                  {entry.kind}
+                </span>
+                <StarRating rating={entry.rating} /> 
+              </div>
+
+              {/* ROW 2: Title & Creator */}
+              <div className="mb-4">
+                <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
+                  <Link to={`/entry/${entry.id}`} className="hover:text-blue-600 transition-colors">
+                    {entry.title}
+                  </Link>
+                </h3>
+                {entry.creator && (
+                  <p className="text-sm text-gray-500">
+                    {prefix} <span className="font-medium text-gray-700">{entry.creator}</span>
+                  </p>
                 )}
-                <button onClick={() => onDelete(entry.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors">
-                  Delete
-                </button>
+              </div>
+
+              {/* ROW 3: Date & Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <span className="text-xs font-medium text-gray-400">
+                  Logged {new Date(entry.event_date).toLocaleDateString()}
+                </span>
+                
+                <div className="flex gap-4">
+                  {onEdit && (
+                    <button onClick={() => onEdit(entry)} className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors">
+                      Edit
+                    </button>
+                  )}
+                  <button onClick={() => onDelete(entry.id)} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors">
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import StarRatingInput from './StarRatingInput';
+import MovieSearch from './MovieSearch'; 
+import BookSearch from './BookSearch'; 
 
 export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCancel }) {
   const [formData, setFormData] = useState({
@@ -8,7 +10,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     rating: 5,
     creator: '',
     reflection: '',
-    event_date: new Date().toISOString().split('T')[0]
+    event_date: new Date().toISOString().split('T')[0], // Defaults to Today
+    image_url: '' 
   });
 
   useEffect(() => {
@@ -24,9 +27,10 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     } else {
       onAddEntry(formData);
     }
+    // Reset form after submit
     setFormData({
       title: '', kind: 'book', rating: 5, creator: '', reflection: '',
-      event_date: new Date().toISOString().split('T')[0]
+      event_date: new Date().toISOString().split('T')[0], image_url: ''
     });
   };
 
@@ -37,8 +41,21 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
   const handleRatingChange = (newRating) => {
     setFormData({ ...formData, rating: newRating });
   };
+  
+  // --- THE FIX IS HERE ---
+  const handleAutoSelect = (selection) => {
+    setFormData(prev => ({
+      ...prev,
+      title: selection.title,
+      creator: selection.creator,
+      image_url: selection.image_url,
+      // We explicitly KEEP the current date (Today or Edit Date)
+      // We IGNORE the 'event_date' coming from the API
+      event_date: prev.event_date 
+    }));
+  };
+  // -----------------------
 
-  // --- DYNAMIC LABELS LOGIC ---
   const getCreatorLabel = (kind) => {
     if (kind === 'book') return 'Author';
     if (kind === 'film') return 'Director';
@@ -47,13 +64,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     if (kind === 'exhibition') return 'Artist / Curator';
     return 'Creator';
   };
-
-  const getCreatorPlaceholder = (kind) => {
-    if (kind === 'book') return 'e.g. J.R.R. Tolkien';
-    if (kind === 'film') return 'e.g. Christopher Nolan';
-    return 'e.g. The Artist or Creator';
-  };
-  // ----------------------------
 
   const labelClass = "block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1";
   const inputClass = "w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200";
@@ -69,8 +79,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
 
       <form onSubmit={handleSubmit} className="space-y-5">
         
-        {/* ROW 1: Type + Title (Swapped order so type drives the logic) */}
-        <div className="grid grid-cols-[1fr_2fr] gap-4">
+        {/* ROW 1: Type + Title */}
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Category</label>
             <select name="kind" value={formData.kind} onChange={handleChange} className={inputClass}>
@@ -81,34 +91,54 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               <option value="exhibition">Exhibition</option>
             </select>
           </div>
-
+          
           <div>
             <label className={labelClass}>Title</label>
-            <input name="title" type="text" placeholder="Title of work..." value={formData.title} onChange={handleChange} className={inputClass} required autoFocus />
+            {formData.kind === 'film' ? (
+              <MovieSearch 
+                initialTitle={formData.title} 
+                onSelectMovie={handleAutoSelect} 
+              />
+            ) : formData.kind === 'book' ? (
+              <BookSearch 
+                initialTitle={formData.title} 
+                onSelectBook={handleAutoSelect} 
+              />
+            ) : (
+              <input
+                name="title"
+                type="text"
+                placeholder="Title of work..."
+                value={formData.title}
+                onChange={handleChange}
+                className={inputClass}
+                required
+                autoFocus
+              />
+            )}
           </div>
         </div>
 
-        {/* ROW 2: Creator (Dynamic) + Date */}
+        {/* ROW 2: Creator + Date */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            {/* DYNAMIC LABEL HERE */}
             <label className={labelClass}>{getCreatorLabel(formData.kind)}</label>
             <input 
               name="creator" 
               type="text" 
-              placeholder={getCreatorPlaceholder(formData.kind)} 
+              placeholder={formData.kind === 'book' ? 'Search title above...' : 'Creator Name'}
               value={formData.creator || ''} 
               onChange={handleChange} 
               className={inputClass} 
             />
           </div>
           <div>
-            <label className={labelClass}>Date</label>
+            <label className={labelClass}>Date Experienced</label>
             <input name="event_date" type="date" value={formData.event_date} onChange={handleChange} className={inputClass} required />
           </div>
         </div>
 
-        {/* ROW 3: Rating + Spacer */}
+        {/* ROW 3: Rating + Preview */}
         <div className="grid grid-cols-2 gap-4 items-start">
           <div>
             <label className={labelClass}>Rating</label>
@@ -116,6 +146,13 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               <StarRatingInput value={formData.rating} onChange={handleRatingChange} />
             </div>
           </div>
+          
+          {formData.image_url && (
+            <div className="pt-2">
+              <label className={labelClass}>Cover Preview</label>
+              <img src={formData.image_url} alt="Cover" className="w-14 h-20 object-cover rounded shadow-md border border-gray-100" />
+            </div>
+          )}
         </div>
 
         <div>
@@ -131,7 +168,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
             {entryToEdit ? 'Update' : 'Save Entry'}
           </button>
         </div>
-
       </form>
     </div>
   );

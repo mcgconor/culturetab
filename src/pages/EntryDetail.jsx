@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import EntryForm from '../components/EntryForm';
 import StarRating from '../components/StarRating';
 
+// Color map for badges
 const typeColors = {
   book: "bg-blue-100 text-blue-700 border-blue-200",
   film: "bg-red-100 text-red-700 border-red-200",
@@ -13,7 +14,7 @@ const typeColors = {
   default: "bg-gray-100 text-gray-700 border-gray-200"
 };
 
-// --- PREFIX MAPPING ---
+// Prefix map for context (Written by vs Directed by)
 const creatorPrefixes = {
   book: "Written by",
   film: "Directed by",
@@ -72,12 +73,12 @@ export default function EntryDetail() {
   if (!entry) return <div className="p-10 text-center">Entry not found.</div>;
 
   const badgeColor = typeColors[entry.kind] || typeColors.default;
-  // Get prefix
   const prefix = creatorPrefixes[entry.kind] || creatorPrefixes.default;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       
+      {/* Back Button */}
       <div className="max-w-3xl mx-auto mb-6">
         <button 
           onClick={() => navigate(-1)} 
@@ -87,6 +88,7 @@ export default function EntryDetail() {
         </button>
       </div>
 
+      {/* MODE SWITCHER: EDIT vs VIEW */}
       {isEditing ? (
         <div className="max-w-3xl mx-auto">
           <EntryForm 
@@ -98,45 +100,67 @@ export default function EntryDetail() {
       ) : (
         <article className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           
+          {/* HEADER SECTION */}
           <div className="p-8 border-b border-gray-100 bg-white">
             
-            <div className="flex justify-between items-start mb-6">
-              <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${badgeColor}`}>
-                {entry.kind}
-              </span>
+            <div className="flex flex-col sm:flex-row gap-8">
+              
+              {/* IMAGE (Poster/Cover) - Visible if URL exists */}
+              {entry.image_url && (
+                <div className="flex-shrink-0 mx-auto sm:mx-0 w-48 sm:w-40 shadow-xl rounded-lg overflow-hidden">
+                  <img 
+                    src={entry.image_url} 
+                    alt={entry.title} 
+                    className="w-full h-auto object-cover"
+                  />
+                </div>
+              )}
 
-              <div className="flex gap-4">
-                <button onClick={() => setIsEditing(true)} className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors">
-                  Edit
-                </button>
-                <button onClick={handleDelete} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors">
-                  Delete
-                </button>
+              {/* TEXT CONTENT */}
+              <div className="flex-grow w-full">
+                
+                {/* Top Row: Badge + Actions */}
+                <div className="flex justify-between items-start mb-6">
+                  <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${badgeColor}`}>
+                    {entry.kind}
+                  </span>
+
+                  <div className="flex gap-4">
+                    <button onClick={() => setIsEditing(true)} className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors">
+                      Edit
+                    </button>
+                    <button onClick={handleDelete} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight mb-2">
+                  {entry.title}
+                </h1>
+                
+                {entry.creator && (
+                  <p className="text-xl text-gray-500 font-medium">
+                    {prefix} {entry.creator}
+                  </p>
+                )}
+
+                <div className="mt-6 flex flex-col sm:flex-row justify-between sm:items-end gap-4">
+                  <div>
+                    <StarRating rating={entry.rating} />
+                  </div>
+                  <span className="text-sm font-medium text-gray-400">
+                    {new Date(entry.event_date).toLocaleDateString(undefined, { 
+                      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+                    })}
+                  </span>
+                </div>
+
               </div>
-            </div>
-
-            <h1 className="text-4xl font-black text-gray-900 leading-tight mb-2">
-              {entry.title}
-            </h1>
-            
-            {entry.creator && (
-              <p className="text-xl text-gray-500 font-medium">
-                {prefix} {entry.creator}
-              </p>
-            )}
-
-            <div className="mt-6 flex justify-between items-end">
-              <div className="mt-6">
-                <StarRating rating={entry.rating} />
-              </div>
-              <span className="text-sm font-medium text-gray-400">
-                {new Date(entry.event_date).toLocaleDateString(undefined, { 
-                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-                })}
-              </span>
             </div>
           </div>
 
+          {/* NOTES SECTION */}
           <div className="p-8 bg-gray-50/50 min-h-[300px]">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
               Personal Reflection
@@ -153,6 +177,7 @@ export default function EntryDetail() {
         </article>
       )}
 
+      {/* FOOTER META */}
       {!isEditing && (
         <div className="max-w-3xl mx-auto mt-6 text-center text-xs text-gray-400">
           Entry logged on {new Date(entry.created_at).toLocaleString()}
