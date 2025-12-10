@@ -2,18 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import EntryList from '../components/EntryList';
-import EntryForm from '../components/EntryForm'; // <--- Added
+import EntryForm from '../components/EntryForm'; 
 import Filters from '../components/Filters';
 
 const PAGE_SIZE = 10;
 
-export default function History({ session }) { // <--- Accepts session now
+export default function History({ session }) { 
   const [entries, setEntries] = useState([]);      
   const [totalResults, setTotalResults] = useState(0); 
   const [page, setPage] = useState(0); 
   const [hasMore, setHasMore] = useState(true);
 
-  // UI States for the Form
   const [showForm, setShowForm] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState(null);
 
@@ -52,7 +51,6 @@ export default function History({ session }) { // <--- Accepts session now
     }
   }, [filters]); 
 
-  // Initial Load & Filter Change
   useEffect(() => {
     setPage(0);
     setHasMore(true);
@@ -65,12 +63,11 @@ export default function History({ session }) { // <--- Accepts session now
     fetchEntries(nextPage, filters);
   };
 
-  // --- CRUD LOGIC (Copied from Dashboard) ---
   const addEntry = async (formData) => {
     const { error } = await supabase.from('entries').insert([{ user_id: session.user.id, ...formData, status: 'past' }]);
     if (error) alert(error.message);
     else {
-      fetchEntries(0); // Refresh list
+      fetchEntries(0); 
       setShowForm(false);
     }
   };
@@ -99,37 +96,44 @@ export default function History({ session }) { // <--- Accepts session now
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
-      <header style={{ display: "flex", alignItems: "center", marginBottom: "20px", gap: "15px" }}>
-        <Link to="/" style={{ textDecoration: "none", fontSize: "20px" }}>←</Link>
-        <h1 style={{ margin: 0 }}>Full History</h1>
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <header className="flex items-center mb-8 gap-4">
+        <Link to="/" className="text-xl text-gray-400 hover:text-black transition-colors">←</Link>
+        <h1 className="text-2xl font-bold text-gray-900">Full History</h1>
       </header>
       
-      {/* THE NEW BUTTON */}
-      <button 
-        onClick={() => { setShowForm(!showForm); setEntryToEdit(null); }}
-        style={{ width: "100%", padding: "15px", backgroundColor: showForm ? "#eee" : "#222", color: showForm ? "#333" : "#fff", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer", marginBottom: "20px", fontWeight: "bold" }}
-      >
-        {showForm ? "Cancel" : "+ Log New Entry"}
-      </button>
+      {/* BUTTON: Only show if form is CLOSED */}
+      {!showForm && (
+        <button 
+          onClick={() => { setShowForm(true); setEntryToEdit(null); }}
+          className="w-full py-4 bg-black text-white rounded-xl font-bold shadow-md hover:bg-gray-800 transition-all active:scale-[0.98] mb-8"
+        >
+          + Log New Entry
+        </button>
+      )}
 
-      {/* THE FORM */}
+      {/* FORM */}
       {showForm && (
-        <EntryForm onAddEntry={addEntry} onUpdateEntry={updateEntry} entryToEdit={entryToEdit} setEntryToEdit={setEntryToEdit} />
+        <EntryForm 
+          onAddEntry={addEntry} 
+          onUpdateEntry={updateEntry} 
+          entryToEdit={entryToEdit} 
+          setEntryToEdit={setEntryToEdit}
+          onCancel={() => { setShowForm(false); setEntryToEdit(null); }} 
+        />
       )}
 
       <Filters filters={filters} setFilters={setFilters} />
         
-      <div style={{ minHeight: "60vh" }}>
-        <div style={{ fontSize: "14px", color: "#666", marginBottom: "10px", fontStyle: "italic" }}>
+      <div className="min-h-[60vh]">
+        <div className="text-sm text-gray-500 mb-4 italic">
           {totalResults === 0 ? "No entries found." : `Showing ${entries.length} of ${totalResults} entries`}
         </div>
 
-        {/* Added onEdit handler so pencils work here too */}
         <EntryList entries={entries} onDelete={deleteEntry} onEdit={handleEditClick} />
 
         {hasMore && (
-          <button onClick={loadMore} style={{ display: "block", width: "100%", margin: "20px auto", padding: "12px", backgroundColor: "white", border: "1px solid #ccc", borderRadius: "8px", cursor: "pointer", color: "#555" }}>
+          <button onClick={loadMore} className="w-full mt-8 py-3 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
             Load More ↓
           </button>
         )}

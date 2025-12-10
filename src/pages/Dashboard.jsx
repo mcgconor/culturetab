@@ -7,32 +7,26 @@ import EntryList from '../components/EntryList';
 import Stats from '../components/Stats';
 
 export default function Dashboard({ session }) {
-  // DATA STATES
   const [recentEntries, setRecentEntries] = useState([]);      
   const [statsData, setStatsData] = useState([]);   
-
-  // UI STATES
   const [entryToEdit, setEntryToEdit] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  // 1. Fetch Stats
   const fetchStats = useCallback(async () => {
     const { data, error } = await supabase.from('entries').select('kind'); 
     if (!error) setStatsData(data);
   }, []);
 
-  // 2. Fetch ONLY Recent 3 Entries (Simple fetch, no filters)
   const fetchRecent = useCallback(async () => {
     const { data, error } = await supabase
       .from('entries')
       .select('*')
-      .order('event_date', { ascending: false })
-      .limit(3); // <--- Only grab the top 3
+      .order('created_at', { ascending: false }) // showing recently logged
+      .limit(3); 
     
     if (!error) setRecentEntries(data);
   }, []);
 
-  // Initial Load
   useEffect(() => {
     fetchRecent();
     fetchStats(); 
@@ -42,7 +36,7 @@ export default function Dashboard({ session }) {
     const { error } = await supabase.from('entries').insert([{ user_id: session.user.id, ...formData, status: 'past' }]);
     if (error) alert(error.message);
     else {
-      fetchRecent(); // Refresh recent list
+      fetchRecent();
       fetchStats();
       setShowForm(false);
     }
@@ -76,47 +70,45 @@ export default function Dashboard({ session }) {
   };
 
   return (
-  <div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h1>CultureTab</h1>
-        <button onClick={() => supabase.auth.signOut()} style={{ fontSize: "12px", padding: "5px 10px" }}>
-          Sign Out
-        </button>
-      </header>
+    <div className="max-w-3xl mx-auto px-4 py-8">
       
       <main>
-        <Greeting />
+        <Greeting session={session} />
         <Stats entries={statsData} />
 
-        {/* LOG BUTTON */}
-        <button 
-          onClick={() => { setShowForm(!showForm); setEntryToEdit(null); }}
-          style={{ width: "100%", padding: "15px", backgroundColor: showForm ? "#eee" : "#222", color: showForm ? "#333" : "#fff", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer", marginBottom: "20px", fontWeight: "bold" }}
-        >
-          {showForm ? "Cancel" : "+ Log New Entry"}
-        </button>
+        {/* LOG BUTTON: Only show if form is CLOSED */}
+        {!showForm && (
+          <button 
+            onClick={() => { setShowForm(true); setEntryToEdit(null); }}
+            className="w-full py-4 bg-black text-white rounded-xl font-bold shadow-md hover:bg-gray-800 transition-all active:scale-[0.98] mb-8"
+          >
+            + Log New Entry
+          </button>
+        )}
         
+        {/* FORM */}
         {showForm && (
-          <EntryForm onAddEntry={addEntry} onUpdateEntry={updateEntry} entryToEdit={entryToEdit} setEntryToEdit={setEntryToEdit} />
+          <EntryForm 
+            onAddEntry={addEntry} 
+            onUpdateEntry={updateEntry} 
+            entryToEdit={entryToEdit} 
+            // When user clicks cancel inside form, we close it here
+            onCancel={() => { setShowForm(false); setEntryToEdit(null); }} 
+          />
         )}
         
         {/* RECENT ACTIVITY */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "30px", marginBottom: "15px" }}>
-          <h3 style={{ margin: 0 }}>Recent Activity</h3>
-          <Link to="/history" style={{ color: "#007bff", textDecoration: "none", fontSize: "14px", fontWeight: "bold" }}>
+        <div className="flex justify-between items-center mt-8 mb-4">
+          <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
+          <Link to="/history" className="text-blue-600 font-bold text-sm hover:underline">
             View All →
           </Link>
         </div>
 
         <EntryList entries={recentEntries} onDelete={deleteEntry} onEdit={handleEditClick} />
 
-        {/* Big Navigation Button */}
-        <Link to="/history" style={{ textDecoration: "none" }}>
-          <button style={{ 
-            display: "block", width: "100%", margin: "20px auto", padding: "15px", 
-            backgroundColor: "white", border: "2px solid #eee", borderRadius: "8px", 
-            cursor: "pointer", color: "#222", fontWeight: "bold", fontSize: "16px"
-          }}>
+        <Link to="/history">
+          <button className="w-full mt-8 py-4 bg-white border border-gray-200 text-gray-900 rounded-xl font-bold shadow-sm hover:bg-gray-50 transition-colors">
             📂 Browse Full History
           </button>
         </Link>

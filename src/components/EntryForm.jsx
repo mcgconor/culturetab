@@ -1,147 +1,121 @@
 import { useState, useEffect } from 'react';
+import StarRatingInput from './StarRatingInput';
 
-function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, setEntryToEdit }) {
-  // Default Empty State
-  const defaultState = {
-    title: "",
-    kind: "book",
-    creator: "",
-    rating: 3,
-    reflection: "",
+export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCancel }) {
+  const [formData, setFormData] = useState({
+    title: '',
+    kind: 'book',
+    rating: 5,
+    creator: '',
+    reflection: '',
     event_date: new Date().toISOString().split('T')[0]
-  };
+  });
 
-  const [formData, setFormData] = useState(defaultState);
-
-  // MAGIC: Watch for "entryToEdit" changes. If it exists, fill the form!
   useEffect(() => {
     if (entryToEdit) {
-      setFormData({
-        title: entryToEdit.title,
-        kind: entryToEdit.kind,
-        creator: entryToEdit.creator || "", // Handle nulls safely
-        rating: entryToEdit.rating || 3,
-        reflection: entryToEdit.reflection || "",
-        event_date: entryToEdit.event_date
-      });
-    } else {
-      setFormData(defaultState);
+      setFormData(entryToEdit);
     }
   }, [entryToEdit]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
-    
     if (entryToEdit) {
-      // If we are editing, call the Update function
       onUpdateEntry(entryToEdit.id, formData);
     } else {
-      // Otherwise, call the Add function
       onAddEntry(formData);
     }
-
-    // Reset Form
-    setFormData(defaultState);
-    setEntryToEdit(null); // Exit edit mode
+    setFormData({
+      title: '', kind: 'book', rating: 5, creator: '', reflection: '',
+      event_date: new Date().toISOString().split('T')[0]
+    });
   };
 
-  const handleCancel = () => {
-    setFormData(defaultState);
-    setEntryToEdit(null);
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  const handleRatingChange = (newRating) => {
+    setFormData({ ...formData, rating: newRating });
+  };
+
+  const labelClass = "block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1";
+  const inputClass = "w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200";
 
   return (
-    <form onSubmit={handleSubmit} style={{ 
-      display: "flex", 
-      flexDirection: "column", 
-      gap: "15px", 
-      padding: "20px", 
-      border: entryToEdit ? "2px solid #4a90e2" : "1px solid #eee", // Highlight when editing
-      borderRadius: "8px",
-      marginTop: "20px",
-      backgroundColor: entryToEdit ? "#f0f7ff" : "#f9f9f9",
-      transition: "all 0.3s ease"
-    }}>
+    // 1. REVERTED TO WHITE BACKGROUND
+    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg mb-8 animate-fade-in-down">
       
-      {entryToEdit && <div style={{fontWeight: "bold", color: "#4a90e2"}}>✏️ Editing: {entryToEdit.title}</div>}
-
-      <div style={{ display: "flex", gap: "10px" }}>
-        <select 
-          value={formData.kind}
-          onChange={(e) => setFormData({...formData, kind: e.target.value})}
-          style={{ padding: "10px", flex: 1 }}
-        >
-          <option value="book">Book</option>
-          <option value="film">Film</option>
-          <option value="theatre">Theatre</option>
-          <option value="concert">Concert</option>
-          <option value="exhibition">Exhibition</option>
-          <option value="other">Other</option>
-        </select>
-
-        <input 
-          type="date" 
-          value={formData.event_date}
-          onChange={(e) => setFormData({...formData, event_date: e.target.value})}
-          style={{ padding: "10px" }}
-          required
-        />
+      {/* 2. CLEANER HEADER (Removed the old top Cancel button) */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-gray-900">
+          {entryToEdit ? 'Edit Entry' : 'New Entry'}
+        </h2>
       </div>
 
-      <input 
-        type="text" 
-        value={formData.title}
-        onChange={(e) => setFormData({...formData, title: e.target.value})}
-        placeholder="Title"
-        style={{ padding: "10px" }}
-        required
-      />
-
-      <input 
-        type="text" 
-        value={formData.creator}
-        onChange={(e) => setFormData({...formData, creator: e.target.value})}
-        placeholder="Creator"
-        style={{ padding: "10px" }}
-      />
-
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <label>Rating:</label>
-        <select 
-          value={formData.rating}
-          onChange={(e) => setFormData({...formData, rating: parseInt(e.target.value)})}
-          style={{ padding: "10px" }}
-        >
-          <option value="1">1 Star</option>
-          <option value="2">2 Stars</option>
-          <option value="3">3 Stars</option>
-          <option value="4">4 Stars</option>
-          <option value="5">5 Stars</option>
-        </select>
-      </div>
-
-      <textarea 
-        value={formData.reflection}
-        onChange={(e) => setFormData({...formData, reflection: e.target.value})}
-        placeholder="Notes..."
-        rows="3"
-        style={{ padding: "10px", fontFamily: "inherit" }}
-      />
-
-      <div style={{ display: "flex", gap: "10px" }}>
-        <button type="submit" style={{ flex: 1, padding: "12px", backgroundColor: "#222", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" }}>
-          {entryToEdit ? "Update Entry" : "Log Entry"}
-        </button>
+      <form onSubmit={handleSubmit} className="space-y-5">
         
-        {entryToEdit && (
-          <button type="button" onClick={handleCancel} style={{ padding: "12px", backgroundColor: "#ccc", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+        <div>
+          <label className={labelClass}>Title</label>
+          <input name="title" type="text" placeholder="e.g. The Matrix..." value={formData.title} onChange={handleChange} className={inputClass} required autoFocus />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Creator</label>
+            <input name="creator" type="text" placeholder="Director, Author..." value={formData.creator || ''} onChange={handleChange} className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Date</label>
+            <input name="event_date" type="date" value={formData.event_date} onChange={handleChange} className={inputClass} required />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 items-start">
+          <div>
+            <label className={labelClass}>Category</label>
+            <select name="kind" value={formData.kind} onChange={handleChange} className={inputClass}>
+              <option value="book">Book</option>
+              <option value="film">Film</option>
+              <option value="concert">Concert</option>
+              <option value="theatre">Theatre</option>
+              <option value="exhibition">Exhibition</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className={labelClass}>Rating</label>
+            <div className="pt-2">
+              <StarRatingInput value={formData.rating} onChange={handleRatingChange} />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Reflection</label>
+          <textarea name="reflection" placeholder="Thoughts..." value={formData.reflection || ''} onChange={handleChange} className={`${inputClass} min-h-[100px] resize-y`} />
+        </div>
+
+        {/* BOTTOM ACTION BAR */}
+        <div className="flex gap-3 pt-2">
+          
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="flex-1 bg-gray-100 text-gray-600 font-bold py-4 rounded-xl hover:bg-gray-200 transition-colors"
+          >
             Cancel
           </button>
-        )}
-      </div>
-    </form>
+
+          <button 
+            type="submit" 
+            className="flex-[2] bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all shadow-md hover:shadow-lg"
+          >
+            {entryToEdit ? 'Update' : 'Save Entry'}
+          </button>
+        
+        </div>
+
+      </form>
+    </div>
   );
 }
-
-export default EntryForm;

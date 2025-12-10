@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import StarRating from '../components/StarRating';
 import EntryForm from '../components/EntryForm'; // <--- Import the form
 
 // Re-using the color map
@@ -93,8 +94,9 @@ export default function EntryDetail() {
            {/* Reuse existing form, pass the current entry as "entryToEdit" */}
           <EntryForm 
             entryToEdit={entry} 
-            setEntryToEdit={() => setIsEditing(false)} // Clicking "Cancel" inside form closes it
             onUpdateEntry={handleUpdate}
+            // Detail page uses a different state variable (setIsEditing)
+            onCancel={() => setIsEditing(false)} 
           />
         </div>
       ) : (
@@ -136,17 +138,9 @@ export default function EntryDetail() {
               </p>
             )}
 
-            <div className="mt-6 flex justify-between items-end">
-              <div className="flex items-center gap-1 text-yellow-400 text-lg">
-                {"★".repeat(entry.rating)}
-                <span className="text-gray-200">{"★".repeat(5 - entry.rating)}</span>
-              </div>
-              <span className="text-sm font-medium text-gray-400">
-                {new Date(entry.event_date).toLocaleDateString(undefined, { 
-                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-                })}
-              </span>
-            </div>
+            <div className="mt-6">
+  <StarRating rating={entry.rating} />
+</div>
           </div>
 
           {/* NOTES SECTION */}
