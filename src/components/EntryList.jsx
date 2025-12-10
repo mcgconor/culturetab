@@ -1,93 +1,82 @@
 import { Link } from 'react-router-dom';
 
-function EntryList({ entries, onDelete, onEdit }) { // <--- Receive onEdit
-  if (!entries || entries.length === 0) {
-    return <p style={{ textAlign: "center", color: "#888", marginTop: "20px" }}>No entries yet. Log your first one!</p>;
-  }
+const typeColors = {
+  book: "bg-blue-100 text-blue-700 border-blue-200",
+  film: "bg-red-100 text-red-700 border-red-200",
+  concert: "bg-purple-100 text-purple-700 border-purple-200",
+  theatre: "bg-amber-100 text-amber-700 border-amber-200",
+  exhibition: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  default: "bg-gray-100 text-gray-700 border-gray-200"
+};
+
+export default function EntryList({ entries, onDelete, onEdit }) {
+  
+  if (!entries || entries.length === 0) return null;
 
   return (
-    <div style={{ marginTop: "30px" }}>
-      <h3>My History</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-        {entries.map((entry) => (
-          <div key={entry.id} style={{ 
-            position: "relative",
-            padding: "15px", 
-            border: "1px solid #eee", 
-            borderRadius: "8px", 
-            backgroundColor: "white",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.05)"
-          }}>
+    <div className="space-y-4">
+      {entries.map((entry) => {
+        const badgeColor = typeColors[entry.kind] || typeColors.default;
+        
+        return (
+          <div 
+            key={entry.id} 
+            className="group bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
+          >
             
-            <div style={{ position: "absolute", top: "10px", right: "10px", display: "flex", gap: "5px" }}>
-              {/* EDIT BUTTON */}
-              <button 
-                onClick={() => onEdit(entry)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-                title="Edit Entry"
-              >
-                ✏️
-              </button>
-
-              {/* DELETE BUTTON */}
-              <button 
-                onClick={() => onDelete(entry.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#ff4444",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-                title="Delete Entry"
-              >
-                🗑️
-              </button>
-            </div>
-
-            {/* Content with Padding Fix */}
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "baseline",
-              paddingRight: "60px" // <--- Breathing room for buttons
-            }}>
-              <h4 style={{ margin: "0 0 5px 0" }}>
-  <Link 
-    to={`/entry/${entry.id}`} 
-    style={{ textDecoration: "none", color: "#222" }}
-  >
-    {entry.title}
-  </Link>
-</h4>
-              <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", backgroundColor: "#f0f0f0" }}>
+            {/* ROW 1: Badge + Rating (Top Bar) */}
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${badgeColor}`}>
                 {entry.kind}
               </span>
-            </div>
-            
-            {entry.creator && <div style={{ fontSize: "14px", color: "#555", marginBottom: "5px" }}>by {entry.creator}</div>}
-            
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px", color: "#777" }}>
-              <span>{"★".repeat(entry.rating)}{"☆".repeat(5 - entry.rating)}</span>
-              <span>•</span>
-              <span>{new Date(entry.event_date).toLocaleDateString()}</span>
+              
+              <div className="flex text-yellow-400 text-sm">
+                {"★".repeat(entry.rating)}
+                <span className="text-gray-200">{"★".repeat(5 - entry.rating)}</span>
+              </div>
             </div>
 
-            {entry.reflection && (
-              <p style={{ marginTop: "10px", fontSize: "14px", fontStyle: "italic", color: "#444" }}>
-                "{entry.reflection}"
-              </p>
-            )}
+            {/* ROW 2: Title & Creator (Main Content) */}
+            <div className="mb-4">
+              <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">
+                <Link to={`/entry/${entry.id}`} className="hover:text-blue-600 transition-colors">
+                  {entry.title}
+                </Link>
+              </h3>
+              {entry.creator && (
+                <p className="text-sm text-gray-500">
+                  by <span className="font-medium text-gray-700">{entry.creator}</span>
+                </p>
+              )}
+            </div>
+
+            {/* ROW 3: Date & Actions (Footer Bar) */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <span className="text-xs font-medium text-gray-400">
+                Logged {new Date(entry.event_date).toLocaleDateString()}
+              </span>
+              
+              <div className="flex gap-4">
+                {onEdit && (
+                  <button 
+                    onClick={() => onEdit(entry)}
+                    className="text-xs font-bold text-gray-400 hover:text-blue-600 uppercase tracking-wider transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button 
+                  onClick={() => onDelete(entry.id)}
+                  className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
-
-export default EntryList;

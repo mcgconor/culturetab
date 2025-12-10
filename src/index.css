@@ -1,5 +1,8 @@
-/* --- MOBILE ZOOM FIX --- */
-/* Forces all inputs to be 16px on mobile so iOS doesn't zoom in */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mobile Zoom Fix */
 @media screen and (max-width: 768px) {
   input, select, textarea, button {
     font-size: 16px !important;
