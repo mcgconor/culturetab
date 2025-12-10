@@ -21,7 +21,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard session={session} />} />
-        <Route path="/history" element={<History />} /> 
+        <Route path="/history" element={<History session={session} />} /> 
         <Route path="/entry/:id" element={<EntryDetail />} />
       </Routes>
     </Router>
