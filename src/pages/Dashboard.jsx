@@ -1,156 +1,148 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import Greeting from '../components/Greeting';
 import EntryForm from '../components/EntryForm';
 import EntryList from '../components/EntryList';
 import Stats from '../components/Stats';
+import DublinEvents from '../components/DublinEvents';
 
 export default function Dashboard({ session }) {
-  const [recentEntries, setRecentEntries] = useState([]);      
-  const [statsData, setStatsData] = useState([]);   
-  const [entryToEdit, setEntryToEdit] = useState(null);
+  const [entries, setEntries] = useState([]);
+  const [statsData, setStatsData] = useState([]);
   const [showForm, setShowForm] = useState(false);
+  const [entryToEdit, setEntryToEdit] = useState(null);
+  
+  const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || 'there';
 
-  const fetchStats = useCallback(async () => {
-    const { data, error } = await supabase.from('entries').select('kind'); 
-    if (!error) setStatsData(data);
-  }, []);
-
+  // 1. DATA FETCHING
   const fetchRecent = useCallback(async () => {
     const { data, error } = await supabase
       .from('entries')
       .select('*')
-      .order('created_at', { ascending: false }) // showing recently logged
-      .limit(3); 
-    
-    if (!error) setRecentEntries(data);
+      .order('event_date', { ascending: false }) 
+      .limit(5);
+
+    if (error) console.error('Error fetching recent:', error);
+    else setEntries(data);
   }, []);
 
-  useEffect(() => {
-    fetchRecent();
-    fetchStats(); 
-  }, [fetchRecent, fetchStats]);
+  const fetchStats = useCallback(async () => {
+    const { data, error } = await supabase.from('entries').select('*');
+    if (!error) setStatsData(data);
+  }, []);
 
-  // NEW: Check for "Ghost Entries" from the public homepage
+  // 2. GHOST ENTRY HANDLING
   useEffect(() => {
     const processPendingEntry = async () => {
       const pendingStr = localStorage.getItem('pendingEntry');
-      
-      if (pendingStr) {
+      if (pendingStr && session?.user) {
         try {
           const pendingData = JSON.parse(pendingStr);
-          
-          // 1. Insert into Supabase
           const { error } = await supabase.from('entries').insert([{
             user_id: session.user.id,
             ...pendingData,
             status: 'past'
           }]);
-
-          if (error) {
-            console.error('Failed to save pending entry:', error);
-            alert('We tried to save your pending entry but something went wrong.');
-          } else {
-            // 2. Success! Refresh the list and clear storage
-            fetchRecent();
-            fetchStats();
-            // Optional: Show a nice "Saved!" toast here
-          }
-        } catch (err) {
-          console.error('Error parsing pending entry', err);
-        } finally {
-          // 3. Always clear the storage so we don't duplicate it next refresh
-          localStorage.removeItem('pendingEntry');
-        }
+          if (!error) { fetchRecent(); fetchStats(); }
+        } catch (err) { console.error(err); } 
+        finally { localStorage.removeItem('pendingEntry'); }
       }
     };
-
     processPendingEntry();
-  }, [session, fetchRecent, fetchStats]); // Runs once when session is ready
+  }, [session, fetchRecent, fetchStats]);
 
-  const addEntry = async (formData) => {
-    const { error } = await supabase.from('entries').insert([{ user_id: session.user.id, ...formData, status: 'past' }]);
+  useEffect(() => { 
+    fetchRecent(); 
+    fetchStats(); 
+  }, [fetchRecent, fetchStats]);
+
+  // 3. ACTION HANDLERS
+  const handleAddEntry = async (formData) => {
+    const { error } = await supabase.from('entries').insert([
+      { user_id: session.user.id, ...formData, status: 'past' }
+    ]);
     if (error) alert(error.message);
-    else {
-      fetchRecent();
-      fetchStats();
-      setShowForm(false);
-    }
+    else { setShowForm(false); fetchRecent(); fetchStats(); }
   };
 
-  const updateEntry = async (id, formData) => {
-    const { error } = await supabase.from('entries').update(formData).eq('id', id);
-    if (error) alert(error.message);
-    else {
-      fetchRecent();
-      fetchStats();
-      setShowForm(false);
-      setEntryToEdit(null);
-    }
-  };
-
-  const deleteEntry = async (id) => {
-    if (!window.confirm("Are you sure?")) return;
+  const handleDelete = async (id) => {
     const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (error) alert(error.message);
-    else {
-      fetchRecent();
-      fetchStats();
-    }
+    if (!error) { fetchRecent(); fetchStats(); }
   };
 
-  const handleEditClick = (entry) => {
+  const handleUpdate = async (id, formData) => {
+    const { error } = await supabase.from('entries').update(formData).eq('id', id);
+    if (!error) { setEntryToEdit(null); setShowForm(false); fetchRecent(); fetchStats(); }
+  };
+
+  const startEdit = (entry) => {
     setEntryToEdit(entry);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-3xl mx-auto px-4 py-12 animate-fade-in">
       
-      <main>
-        <Greeting session={session} />
-        <Stats entries={statsData} />
+      {/* SECTION A: HEADER & ACTION */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-gray-100 pb-8">
+        <div>
+          <h1 className="text-4xl font-black text-gray-900 mb-2">
+            Welcome back, {firstName}.
+          </h1>
+          <p className="text-gray-500 text-lg max-w-md leading-relaxed">
+            Ready to log your latest culture fix? Track your books, films, and art here.
+          </p>
+        </div>
 
-        {/* LOG BUTTON: Only show if form is CLOSED */}
         {!showForm && (
           <button 
-            onClick={() => { setShowForm(true); setEntryToEdit(null); }}
-            className="w-full py-4 bg-black text-white rounded-xl font-bold shadow-md hover:bg-gray-800 transition-all active:scale-[0.98] mb-8"
+            onClick={() => { setEntryToEdit(null); setShowForm(true); }}
+            className="flex-shrink-0 bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]"
           >
             + Log New Entry
           </button>
         )}
-        
-        {/* FORM */}
-        {showForm && (
+      </div>
+
+      {/* FORM OVERLAY (If Open) */}
+      {showForm && (
+        <div className="mb-12">
           <EntryForm 
-            onAddEntry={addEntry} 
-            onUpdateEntry={updateEntry} 
-            entryToEdit={entryToEdit} 
-            // When user clicks cancel inside form, we close it here
-            onCancel={() => { setShowForm(false); setEntryToEdit(null); }} 
+            onAddEntry={handleAddEntry}
+            onUpdateEntry={handleUpdate}
+            entryToEdit={entryToEdit}
+            onCancel={() => { setShowForm(false); setEntryToEdit(null); }}
           />
-        )}
-        
-        {/* RECENT ACTIVITY */}
-        <div className="flex justify-between items-center mt-8 mb-4">
-          <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-          <Link to="/history" className="text-blue-600 font-bold text-sm hover:underline">
-            View All →
-          </Link>
+        </div>
+      )}
+
+      {/* SECTION B: STATS */}
+      <div className="mb-12">
+         <Stats entries={statsData} />
+      </div>
+
+      {/* SECTION C: UPCOMING EVENTS (New Filtered Widget) */}
+      <DublinEvents />
+
+      {/* SECTION D: RECENT ACTIVITY */}
+      <div>
+        <div className="flex justify-between items-end mb-4 border-b border-gray-100 pb-2">
+          <h2 className="text-xl font-bold text-gray-900">Your Recent Activity</h2>
+          {entries.length > 0 && (
+             <a href="/history" className="text-sm font-bold text-gray-400 hover:text-black transition-colors">
+               View All →
+             </a>
+          )}
         </div>
 
-        <EntryList entries={recentEntries} onDelete={deleteEntry} onEdit={handleEditClick} />
-
-        <Link to="/history">
-          <button className="w-full mt-8 py-4 bg-white border border-gray-200 text-gray-900 rounded-xl font-bold shadow-sm hover:bg-gray-50 transition-colors">
-            📂 Browse Full History
-          </button>
-        </Link>
-
-      </main>
+        {entries.length === 0 && !showForm ? (
+          <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+            <p className="text-gray-400 font-medium">No entries yet. Start logging!</p>
+          </div>
+        ) : (
+          <EntryList entries={entries} onDelete={handleDelete} onEdit={startEdit} />
+        )}
+      </div>
     </div>
   );
 }

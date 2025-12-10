@@ -15,6 +15,8 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Contact from './pages/Contact';
 import NotFound from './pages/NotFound';
+import Events from './pages/Events';
+import PublicEventDetail from './pages/PublicEventDetail';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -48,6 +50,8 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/event/:id" element={<PublicEventDetail />} />
 
             {/* THE SPLIT HOME PAGE */}
             {/* If logged in -> Dashboard. If logged out -> Auth Landing Page */}

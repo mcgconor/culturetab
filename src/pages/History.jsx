@@ -1,143 +1,171 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { Link, useNavigate } from 'react-router-dom';
 import EntryList from '../components/EntryList';
-import EntryForm from '../components/EntryForm'; 
-import Filters from '../components/Filters';
 
-const PAGE_SIZE = 10;
+export default function History() {
+  const [entries, setEntries] = useState([]);
+  const [filteredEntries, setFilteredEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // FILTERS
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [rating, setRating] = useState('');
 
-export default function History({ session }) { 
-  const [entries, setEntries] = useState([]);      
-  const [totalResults, setTotalResults] = useState(0); 
-  const [page, setPage] = useState(0); 
-  const [hasMore, setHasMore] = useState(true);
-
-  const [showForm, setShowForm] = useState(false);
-  const [entryToEdit, setEntryToEdit] = useState(null);
-
-  const [filters, setFilters] = useState({
-    kind: 'all', rating: 'all', sort: 'newest', search: ''
-  });
-
-  const fetchEntries = useCallback(async (pageNumber = 0, currentFilters = filters) => {
-    const from = pageNumber * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-
-    let query = supabase.from('entries').select('*', { count: 'exact' });
-
-    if (currentFilters.search && currentFilters.search.trim() !== '') {
-      const term = currentFilters.search.trim();
-      query = query.or(`title.ilike.%${term}%,creator.ilike.%${term}%`);
-    }
-
-    if (currentFilters.kind !== 'all') query = query.eq('kind', currentFilters.kind);
-    if (currentFilters.rating !== 'all') query = query.gte('rating', parseInt(currentFilters.rating));
-
-    if (currentFilters.sort === 'newest') query = query.order('event_date', { ascending: false });
-    else if (currentFilters.sort === 'oldest') query = query.order('event_date', { ascending: true });
-    else if (currentFilters.sort === 'highest') query = query.order('rating', { ascending: false });
-
-    const { data, count, error } = await query.range(from, to);
-    
-    if (error) console.error('Error fetching:', error);
-    else {
-      if (pageNumber === 0) setEntries(data);
-      else setEntries((prev) => [...prev, ...data]);
-
-      setTotalResults(count); 
-      if ((pageNumber * PAGE_SIZE) + data.length >= count) setHasMore(false);
-      else setHasMore(true);
-    }
-  }, [filters]); 
+  const navigate = useNavigate();
 
   useEffect(() => {
-    setPage(0);
-    setHasMore(true);
-    fetchEntries(0, filters);
-  }, [filters, fetchEntries]);
+    fetchEntries();
+  }, []);
 
-  const loadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchEntries(nextPage, filters);
-  };
+  const fetchEntries = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('entries')
+      .select('*')
+      .order('event_date', { ascending: false });
 
-  const addEntry = async (formData) => {
-    const { error } = await supabase.from('entries').insert([{ user_id: session.user.id, ...formData, status: 'past' }]);
-    if (error) alert(error.message);
+    if (error) console.error(error);
     else {
-      fetchEntries(0); 
-      setShowForm(false);
+      setEntries(data);
+      setFilteredEntries(data);
     }
+    setLoading(false);
   };
 
-  const updateEntry = async (id, formData) => {
-    const { error } = await supabase.from('entries').update(formData).eq('id', id);
-    if (error) alert(error.message);
-    else {
-      fetchEntries(0);
-      setShowForm(false);
-      setEntryToEdit(null);
+  // Instant Client Filtering
+  useEffect(() => {
+    let result = entries;
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(e => 
+        e.title.toLowerCase().includes(q) || 
+        e.creator?.toLowerCase().includes(q)
+      );
     }
+    if (category) {
+      result = result.filter(e => e.kind === category);
+    }
+    if (rating) {
+      result = result.filter(e => e.rating === parseInt(rating));
+    }
+    setFilteredEntries(result);
+  }, [search, category, rating, entries]);
+
+  const handleReset = () => {
+    setSearch('');
+    setCategory('');
+    setRating('');
   };
 
-  const deleteEntry = async (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Are you sure?")) return;
     const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (error) alert(error.message);
-    else fetchEntries(0);
+    if (!error) fetchEntries();
   };
 
-  const handleEditClick = (entry) => {
-    setEntryToEdit(entry);
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  // COMMON STYLES
+  const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400";
+  const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <header className="flex items-center mb-8 gap-4">
-        <Link to="/" className="text-xl text-gray-400 hover:text-black transition-colors">←</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Full History</h1>
-      </header>
+    <div className="max-w-3xl mx-auto px-4 py-8 min-h-screen animate-fade-in">
       
-      {/* BUTTON: Only show if form is CLOSED */}
-      {!showForm && (
-        <button 
-          onClick={() => { setShowForm(true); setEntryToEdit(null); }}
-          className="w-full py-4 bg-black text-white rounded-xl font-bold shadow-md hover:bg-gray-800 transition-all active:scale-[0.98] mb-8"
+      {/* 1. TOP NAV */}
+      <div className="mb-6">
+        <Link 
+          to="/" 
+          className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-2"
         >
-          + Log New Entry
-        </button>
-      )}
+          ← Dashboard
+        </Link>
+      </div>
 
-      {/* FORM */}
-      {showForm && (
-        <EntryForm 
-          onAddEntry={addEntry} 
-          onUpdateEntry={updateEntry} 
-          entryToEdit={entryToEdit} 
-          setEntryToEdit={setEntryToEdit}
-          onCancel={() => { setShowForm(false); setEntryToEdit(null); }} 
-        />
-      )}
+      <div className="mb-8">
+        <h1 className="text-3xl font-black text-gray-900 mb-2">My History</h1>
+        <p className="text-gray-500">All your logged culture entries.</p>
+      </div>
 
-      <Filters filters={filters} setFilters={setFilters} />
+      {/* 2. FILTER BAR */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-8">
         
-      <div className="min-h-[60vh]">
-        <div className="text-sm text-gray-500 mb-4 italic">
-          {totalResults === 0 ? "No entries found." : `Showing ${entries.length} of ${totalResults} entries`}
+        {/* Row 1: Search & Category */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div className="sm:col-span-2">
+            <label className={labelClass}>Search</label>
+            <input 
+              type="text" 
+              placeholder="Search title or creator..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Category</label>
+            <select 
+              value={category} 
+              onChange={(e) => setCategory(e.target.value)}
+              className={`${inputClass} appearance-none cursor-pointer`}
+            >
+              <option value="">All Categories</option>
+              <option value="book">Book</option>
+              <option value="film">Film</option>
+              <option value="concert">Concert</option>
+              <option value="theatre">Theatre</option>
+              <option value="exhibition">Exhibition</option>
+            </select>
+          </div>
         </div>
 
-        <EntryList entries={entries} onDelete={deleteEntry} onEdit={handleEditClick} />
-
-        {hasMore && (
-          <button onClick={loadMore} className="w-full mt-8 py-3 bg-white border border-gray-200 text-gray-600 rounded-lg font-bold hover:bg-gray-50 transition-colors">
-            Load More ↓
-          </button>
-        )}
+        {/* Row 2: Rating & Actions */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 items-end">
+           <div>
+            <label className={labelClass}>Rating</label>
+            <select 
+              value={rating} 
+              onChange={(e) => setRating(e.target.value)}
+              className={`${inputClass} appearance-none cursor-pointer`}
+            >
+              <option value="">Any Rating</option>
+              <option value="5">★★★★★ (5)</option>
+              <option value="4">★★★★ (4+)</option>
+              <option value="3">★★★ (3+)</option>
+            </select>
+          </div>
+          
+          <div className="col-span-1">
+             <button 
+                onClick={handleReset}
+                type="button"
+                className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-sm"
+              >
+                Reset Filters
+              </button>
+          </div>
+          
+          <div className="hidden sm:flex justify-end items-center h-12 text-xs font-bold text-gray-400">
+             Found {filteredEntries.length} entries
+          </div>
+        </div>
       </div>
+
+      {/* 3. ENTRIES LIST */}
+      {loading ? (
+         <div className="text-center py-12 text-gray-400">Loading your history...</div>
+      ) : filteredEntries.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200 mt-8">
+          <p className="text-gray-400 font-medium">No entries match your filters.</p>
+        </div>
+      ) : (
+        <EntryList 
+          entries={filteredEntries} 
+          onDelete={handleDelete}
+          onEdit={(entry) => navigate('/', { state: { editEntry: entry } })} 
+        />
+      )}
     </div>
   );
 }
