@@ -9,6 +9,9 @@ export default function Events() {
   const [visibleEvents, setVisibleEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // UI STATE
+  const [showFilters, setShowFilters] = useState(false); // Collapsed by default
+
   // FILTERS
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('');
@@ -72,7 +75,7 @@ export default function Events() {
     setEndDate('');
   };
 
-  // COMMON STYLES (Strict h-12 enforcement)
+  // COMMON STYLES
   const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
   const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
 
@@ -89,88 +92,99 @@ export default function Events() {
         </button>
       </div>
 
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Dublin Calendar</h1>
-        <p className="text-gray-500">Discover culture happening in your city.</p>
-      </div>
-
-      {/* FILTER BAR - REDESIGNED LAYOUT */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-8">
-        <div className="space-y-5">
-          
-          {/* ROW 1: SEARCH (Full Width) */}
-          <div>
-            <label className={labelClass}>Search</label>
-            <input 
-              type="text" 
-              placeholder="Search artist, venue..." 
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-
-          {/* ROW 2: FILTERS (Grid) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            
-            {/* Category */}
-            <div className="col-span-2 sm:col-span-1">
-              <label className={labelClass}>Category</label>
-              <div className="relative">
-                <select 
-                  value={category} 
-                  onChange={(e) => setCategory(e.target.value)}
-                  className={`${inputClass} cursor-pointer`}
-                >
-                  <option value="">All Types</option>
-                  <option value="music">Music</option>
-                  <option value="arts">Arts</option>
-                  <option value="film">Film</option>
-                </select>
-                {/* Custom Arrow because we used appearance-none */}
-                <div className="absolute right-4 top-4 pointer-events-none text-gray-400 text-xs">▼</div>
-              </div>
-            </div>
-
-            {/* From */}
-            <div>
-              <label className={labelClass}>From</label>
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`${inputClass} px-2 sm:px-4`} // tighter padding on mobile
-              />
-            </div>
-
-            {/* To */}
-            <div>
-              <label className={labelClass}>To</label>
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={`${inputClass} px-2 sm:px-4`}
-              />
-            </div>
-
-            {/* Reset Button */}
-            <div className="col-span-2 sm:col-span-1 flex items-end">
-              <button 
-                onClick={handleReset}
-                className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-xs uppercase tracking-wide"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
+      <div className="mb-8 flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 mb-2 tracking-tight">Dublin Calendar</h1>
+          <p className="text-gray-500">Discover culture happening in your city.</p>
         </div>
         
-        {/* Count */}
-        <div className="mt-4 pt-4 border-t border-gray-100 text-xs font-bold text-gray-400 text-right">
-          Found {visibleEvents.length} events
-        </div>
+        {/* TOGGLE BUTTON */}
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="text-sm font-bold text-black border-b-2 border-black pb-0.5 hover:opacity-70 transition-opacity"
+        >
+          {showFilters ? 'Hide Filters' : 'Search & Filter'}
+        </button>
       </div>
+
+      {/* FILTER BAR (Collapsible) */}
+      {showFilters && (
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm mb-8 animate-fade-in">
+          <div className="space-y-5">
+            
+            {/* ROW 1: SEARCH (Full Width) */}
+            <div>
+              <label className={labelClass}>Search</label>
+              <input 
+                type="text" 
+                placeholder="Search artist, venue..." 
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* ROW 2: FILTERS (Grid) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              
+              {/* Category */}
+              <div className="col-span-2 sm:col-span-1">
+                <label className={labelClass}>Category</label>
+                <div className="relative">
+                  <select 
+                    value={category} 
+                    onChange={(e) => setCategory(e.target.value)}
+                    className={`${inputClass} cursor-pointer`}
+                  >
+                    <option value="">All Types</option>
+                    <option value="music">Music</option>
+                    <option value="arts">Arts</option>
+                    <option value="film">Film</option>
+                  </select>
+                  <div className="absolute right-4 top-4 pointer-events-none text-gray-400 text-xs">▼</div>
+                </div>
+              </div>
+
+              {/* From */}
+              <div>
+                <label className={labelClass}>From</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`${inputClass} px-2 sm:px-4`}
+                />
+              </div>
+
+              {/* To */}
+              <div>
+                <label className={labelClass}>To</label>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`${inputClass} px-2 sm:px-4`}
+                />
+              </div>
+
+              {/* Reset Button */}
+              <div className="col-span-2 sm:col-span-1 flex items-end">
+                <button 
+                  onClick={handleReset}
+                  className="w-full h-12 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors text-xs uppercase tracking-wide"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Count */}
+          <div className="mt-4 pt-4 border-t border-gray-100 text-xs font-bold text-gray-400 text-right">
+            Found {visibleEvents.length} events
+          </div>
+        </div>
+      )}
 
       {/* LIST */}
       <div className="space-y-3">
