@@ -6,13 +6,17 @@
   <link rel="apple-touch-icon" href="/favicon.svg" />
 
   <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-MSMYLDECQT"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MSMYLDECQT"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-    gtag('config', 'G-MSMYLDECQT');
-  </script>
+
+      // ONLY TRACK IF NOT LOCALHOST
+      if (window.location.hostname !== 'localhost') {
+        gtag('config', 'G-MSMYLDECQT');
+      }
+    </script>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
