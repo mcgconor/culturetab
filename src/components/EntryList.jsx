@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 function EntryList({ entries, onDelete, onEdit }) { // <--- Receive onEdit
   if (!entries || entries.length === 0) {
     return <p style={{ textAlign: "center", color: "#888", marginTop: "20px" }}>No entries yet. Log your first one!</p>;
@@ -55,7 +57,14 @@ function EntryList({ entries, onDelete, onEdit }) { // <--- Receive onEdit
               alignItems: "baseline",
               paddingRight: "60px" // <--- Breathing room for buttons
             }}>
-              <h4 style={{ margin: "0 0 5px 0" }}>{entry.title}</h4>
+              <h4 style={{ margin: "0 0 5px 0" }}>
+  <Link 
+    to={`/entry/${entry.id}`} 
+    style={{ textDecoration: "none", color: "#222" }}
+  >
+    {entry.title}
+  </Link>
+</h4>
               <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", backgroundColor: "#f0f0f0" }}>
                 {entry.kind}
               </span>
