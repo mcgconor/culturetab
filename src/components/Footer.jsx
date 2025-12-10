@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'; // <--- Import this
+
 export default function Footer() {
   return (
     <footer className="border-t border-gray-100 bg-gray-50 mt-auto">
@@ -8,8 +10,9 @@ export default function Footer() {
         </div>
 
         <div className="flex gap-6">
-          <a href="#" className="hover:text-gray-600 transition-colors">Privacy Policy</a>
-          <a href="#" className="hover:text-gray-600 transition-colors">Terms of Service</a>
+          {/* Use Link instead of a tag */}
+          <Link to="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
           <a href="mailto:support@culturetab.com" className="hover:text-gray-600 transition-colors">Contact</a>
         </div>
 

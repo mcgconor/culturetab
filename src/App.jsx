@@ -1,51 +1,67 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'; // <--- Added Navigate
 import { supabase } from './supabaseClient';
 
 // Components
-import Navbar from './components/Navbar'; // <--- Newly created
-import Footer from './components/Footer'; // <--- Newly created
+import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import Auth from './components/Auth';
 
 // Pages
 import Dashboard from './pages/Dashboard';     
 import EntryDetail from './pages/EntryDetail'; 
-import History from './pages/History'; 
+import History from './pages/History';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 
 function App() {
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true); // <--- Add loading state to prevent flash
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+    
     return () => subscription.unsubscribe();
   }, []);
 
+  if (loading) return null; // Prevent flickering while checking session
+
   return (
     <Router>
-      {/* LAYOUT WRAPPER:
-         min-h-screen: Forces app to be at least as tall as the window
-         flex-col: Stacks Nav, Content, Footer vertically
-      */}
       <div className="min-h-screen flex flex-col font-sans text-gray-900 bg-white">
         
-        {/* 1. TOP NAVIGATION */}
         <Navbar session={session} />
         
-        {/* 2. MAIN CONTENT (Grows to fill space) */}
         <div className="flex-grow">
-          {!session ? (
-            <Auth />
-          ) : (
-            <Routes>
-              <Route path="/" element={<Dashboard session={session} />} />
-              <Route path="/history" element={<History session={session} />} /> 
-              <Route path="/entry/:id" element={<EntryDetail />} />
-            </Routes>
-          )}
+          <Routes>
+            {/* PUBLIC PAGES (Accessible by everyone) */}
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+
+            {/* THE SPLIT HOME PAGE */}
+            {/* If logged in -> Dashboard. If logged out -> Auth Landing Page */}
+            <Route path="/" element={!session ? <Auth /> : <Dashboard session={session} />} />
+
+            {/* PROTECTED PAGES (Only if logged in, otherwise bounce to Home) */}
+            <Route 
+              path="/history" 
+              element={session ? <History session={session} /> : <Navigate to="/" />} 
+            /> 
+            <Route 
+              path="/entry/:id" 
+              element={session ? <EntryDetail /> : <Navigate to="/" />} 
+            />
+          </Routes>
         </div>
 
-        {/* 3. FOOTER (Pushed to bottom) */}
         <Footer />
         
       </div>
