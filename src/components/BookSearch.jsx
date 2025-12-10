@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 
-// **PASTE YOUR GOOGLE API KEY HERE**
-const GOOGLE_BOOKS_KEY = 'AIzaSyAl-aPcpqmbawaYQurLCjK_SvSGTRPDfVY';
+// Access the key securely from your .env file
+const GOOGLE_BOOKS_KEY = import.meta.env.VITE_GOOGLE_BOOKS_KEY;
 
 export default function BookSearch({ initialTitle = '', onSelectBook }) {
   const [query, setQuery] = useState(initialTitle);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // --- THE FIX: Sync input when data loads ---
+  // Sync input when data loads
   useEffect(() => {
     setQuery(initialTitle);
   }, [initialTitle]);
-  // ------------------------------------------
 
   const searchBooks = async (searchQuery) => {
     if (searchQuery.length < 3) {
@@ -21,7 +20,8 @@ export default function BookSearch({ initialTitle = '', onSelectBook }) {
     }
     setLoading(true);
 
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&key=${'AIzaSyAl-aPcpqmbawaYQurLCjK_SvSGTRPDfVY'}&maxResults=5`;
+    // Use the variable GOOGLE_BOOKS_KEY here, not the hardcoded string
+    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(searchQuery)}&key=${GOOGLE_BOOKS_KEY}&maxResults=5`;
     
     try {
       const response = await fetch(url);
