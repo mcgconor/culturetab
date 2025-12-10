@@ -13,6 +13,8 @@ import EntryDetail from './pages/EntryDetail';
 import History from './pages/History';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import Contact from './pages/Contact';
+import NotFound from './pages/NotFound';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -45,6 +47,7 @@ function App() {
             {/* PUBLIC PAGES (Accessible by everyone) */}
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/contact" element={<Contact />} />
 
             {/* THE SPLIT HOME PAGE */}
             {/* If logged in -> Dashboard. If logged out -> Auth Landing Page */}
@@ -59,6 +62,8 @@ function App() {
               path="/entry/:id" 
               element={session ? <EntryDetail /> : <Navigate to="/" />} 
             />
+            {/* CATCH ALL (Must be at the very bottom) */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
 

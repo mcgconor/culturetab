@@ -13,7 +13,7 @@ export default function Footer() {
           {/* Use Link instead of a tag */}
           <Link to="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
           <Link to="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
-          <a href="mailto:support@culturetab.com" className="hover:text-gray-600 transition-colors">Contact</a>
+          <Link to="/contact" className="hover:text-gray-600 transition-colors">Contact</Link>
         </div>
 
       </div>
