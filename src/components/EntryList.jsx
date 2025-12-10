@@ -23,17 +23,14 @@ export default function EntryList({ entries, onDelete, onEdit }) {
   return (
     <div className="space-y-4">
       {entries.map((entry) => (
-        <div key={entry.id} className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div key={entry.id} className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow relative group">
+          
           <div className="flex gap-4 sm:gap-6">
             
             {/* THUMBNAIL */}
             <div className="flex-shrink-0">
               {entry.image_url ? (
-                <img 
-                  src={entry.image_url} 
-                  alt={entry.title} 
-                  className="w-20 h-28 sm:w-24 sm:h-36 object-cover rounded-lg shadow-sm" 
-                />
+                <img src={entry.image_url} alt={entry.title} className="w-20 h-28 sm:w-24 sm:h-36 object-cover rounded-lg shadow-sm" />
               ) : (
                 <div className="w-20 h-28 sm:w-24 sm:h-36 bg-gray-50 rounded-lg flex items-center justify-center text-3xl shadow-inner border border-gray-100">
                   <span className="opacity-50">?</span>
@@ -45,18 +42,17 @@ export default function EntryList({ entries, onDelete, onEdit }) {
             <div className="flex-grow flex flex-col justify-between py-0.5">
               <div>
                 <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-black text-lg sm:text-xl text-gray-900 leading-tight line-clamp-2">
+                  <h3 className="font-black text-lg sm:text-xl text-gray-900 leading-tight line-clamp-2 pr-2">
                     {entry.title}
                   </h3>
-                  
                   {/* RATING */}
-                  <div className="flex-shrink-0 flex gap-0.5 pt-1 pl-2">
+                  <div className="flex-shrink-0 flex gap-0.5 pt-1">
                      {[...Array(5)].map((_, i) => (
                        <span key={i} className={`text-xs ${i < entry.rating ? 'text-black' : 'text-gray-200'}`}>★</span>
                      ))}
                   </div>
                 </div>
-
+                
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">
                   {getCreatorLabel(entry.kind)}
                 </p>
@@ -64,8 +60,8 @@ export default function EntryList({ entries, onDelete, onEdit }) {
                   {entry.creator}
                 </p>
 
-                {/* PILL & DATE (Restored) */}
-                <div className="flex items-center gap-3">
+                {/* PILL & DATE */}
+                <div className="flex items-center gap-3 mb-2">
                   <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide ${getCategoryColor(entry.kind)}`}>
                     {entry.kind}
                   </span>
@@ -76,8 +72,8 @@ export default function EntryList({ entries, onDelete, onEdit }) {
               </div>
 
               {/* ACTION BUTTONS */}
-              {/* CHANGE: Added 'text-[10px]' for mobile to make them tiny and neat */}
-              <div className="flex justify-end gap-3 mt-3 border-t border-gray-50 pt-2 sm:border-none sm:pt-0">
+              {/* THE FIX: text-[10px] makes them tiny on mobile. sm:text-xs restores normal size on desktop. */}
+              <div className="flex justify-end gap-3 border-t border-gray-50 pt-2 sm:border-none sm:pt-0">
                 <button 
                   onClick={() => onEdit(entry)}
                   className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
