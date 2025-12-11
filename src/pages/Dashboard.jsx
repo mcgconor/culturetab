@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { useLocation } from 'react-router-dom'; // <--- 1. Import this
+import { useLocation } from 'react-router-dom'; 
 import EntryForm from '../components/EntryForm';
 import EntryList from '../components/EntryList';
 import Stats from '../components/Stats';
@@ -12,7 +12,7 @@ export default function Dashboard({ session }) {
   const [showForm, setShowForm] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState(null);
   
-  const location = useLocation(); // <--- 2. Get location state
+  const location = useLocation(); 
   const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || 'there';
 
   // HELPER: Start Editing
@@ -36,17 +36,22 @@ export default function Dashboard({ session }) {
     const { data, error } = await supabase
       .from('entries')
       .select('*')
+      .eq('user_id', session.user.id) // <--- CRITICAL FIX: Filter by User ID
       .order('event_date', { ascending: false }) 
       .limit(5);
 
     if (error) console.error('Error fetching recent:', error);
     else setEntries(data);
-  }, []);
+  }, [session.user.id]); // Added dependency
 
   const fetchStats = useCallback(async () => {
-    const { data, error } = await supabase.from('entries').select('*');
+    const { data, error } = await supabase
+      .from('entries')
+      .select('*')
+      .eq('user_id', session.user.id); // <--- CRITICAL FIX: Filter by User ID
+      
     if (!error) setStatsData(data);
-  }, []);
+  }, [session.user.id]); // Added dependency
 
   // GHOST ENTRY LOGIC
   useEffect(() => {

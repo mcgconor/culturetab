@@ -13,34 +13,74 @@ import Terms from './pages/Terms';
 import Contact from './pages/Contact';
 import Events from './pages/Events';
 import PublicEventDetail from './pages/PublicEventDetail';
-import EntryDetail from './pages/EntryDetail'; // <--- Imported exactly once
+import EntryDetail from './pages/EntryDetail';
+import Admin from './pages/Admin';
+
+const ADMIN_ROUTE_PATH = "/bobs";
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // NEW: Specific flag to know when the DB check is totally finished
+  const [adminCheckDone, setAdminCheckDone] = useState(false); 
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    // 1. Check Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setLoading(false);
+      setIsReady(true); 
+      
+      if (session?.user) {
+        checkAdminStatus(session.user.id);
+      } else {
+        // No user = definitely not admin, and check is done
+        setAdminCheckDone(true);
+      }
     });
 
+    // 2. Auth Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setLoading(false);
+      setIsReady(true);
+      if (session) {
+        // Reset check status when user changes, then check again
+        setAdminCheckDone(false); 
+        checkAdminStatus(session.user.id);
+      } else {
+        setIsAdmin(false);
+        setAdminCheckDone(true);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400">Loading CultureTab...</div>;
+  const checkAdminStatus = async (userId) => {
+    console.log("Checking admin status...");
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
+    
+    if (data && data.is_admin) {
+      console.log("Admin confirmed.");
+      setIsAdmin(true);
+    }
+    // CRITICAL: Mark the check as finished, regardless of result
+    setAdminCheckDone(true); 
+  };
+
+  if (!isReady) {
+    return <div className="p-10 text-center text-gray-400">Initializing...</div>;
   }
 
   return (
     <Router>
       <div className="flex flex-col min-h-screen bg-white font-sans text-gray-900">
-        <Navbar session={session} />
+        <Navbar session={session} isAdmin={isAdmin} /> 
         
         <main className="flex-grow">
           <Routes>
@@ -48,8 +88,6 @@ export default function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
-            
-            {/* PUBLIC EVENT CALENDAR (Ticketmaster/Supabase) */}
             <Route path="/events" element={<Events />} />
             <Route path="/event/:id" element={<PublicEventDetail />} />
 
@@ -58,11 +96,27 @@ export default function App() {
               <Route path="*" element={<Auth />} />
             ) : (
               <>
+                {/* ADMIN ROUTE - INTELLIGENT WAITING */}
+                <Route 
+                  path={ADMIN_ROUTE_PATH} 
+                  element={
+                    !adminCheckDone ? (
+                      // 1. If we are still checking DB, show a loading text (don't redirect yet!)
+                      <div className="p-20 text-center text-gray-500">Verifying Permissions...</div>
+                    ) : isAdmin ? (
+                      // 2. Check done + Is Admin = Show Dashboard
+                      <Admin session={session} isAdmin={isAdmin} /> 
+                    ) : (
+                      // 3. Check done + Not Admin = Redirect
+                      <Navigate to="/" replace />
+                    )
+                  } 
+                />
+
+                {/* USER ROUTES */}
                 <Route path="/" element={<Dashboard session={session} />} />
                 <Route path="/history" element={<History />} />
-                
-                {/* PRIVATE ENTRY DETAIL (Your Log) */}
-                <Route path="/entry/:id" element={<EntryDetail />} />
+                <Route path="/entry/:id" element={<EntryDetail />} />  
                 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </>

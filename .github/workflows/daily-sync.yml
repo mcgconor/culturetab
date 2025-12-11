@@ -3,7 +3,7 @@ name: Daily Event Sync
 on:
   schedule:
     - cron: "0 4 * * *" # Runs at 4am UTC every day
-  workflow_dispatch: # Allows you to click "Run Now" manually
+  workflow_dispatch: # Allows you to click "Run Now" manually in GitHub
 
 jobs:
   sync-events:
@@ -23,15 +23,22 @@ jobs:
 
       # 1. Ticketmaster Sync
       - name: Sync Ticketmaster
-        run: node sync.js
+        run: node scrapers/syncTicketmaster.js
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
           VITE_TICKETMASTER_KEY: ${{ secrets.VITE_TICKETMASTER_KEY }}
 
-      # 2. Journal of Music Sync (NEW)
-      - name: Sync Journal of Music
-        run: node syncJournal.js
+      # 2. IFI Cinema Sync (NEW)
+      - name: Sync IFI Cinema
+        run: node scrapers/syncIFI.js
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+
+      # 3. Journal of Music Sync
+      - name: Sync Journal of Music
+        run: node scrapers/syncJournal.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}

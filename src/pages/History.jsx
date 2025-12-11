@@ -7,6 +7,7 @@ export default function History() {
   const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null); // <--- 1. Add Session State
   
   // FILTERS
   const [search, setSearch] = useState('');
@@ -14,30 +15,40 @@ export default function History() {
   const [rating, setRating] = useState('');
   
   // UI STATE
-  const [showFilters, setShowFilters] = useState(false); // Collapsed by default
+  const [showFilters, setShowFilters] = useState(false); 
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 1. Check for incoming "Stats" click
+  // 1. GET SESSION
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+  }, []);
+
+  // 2. Check for incoming "Stats" click
   useEffect(() => {
     if (location.state?.initialCategory) {
       setCategory(location.state.initialCategory);
-      setShowFilters(true); // Open filters so user sees why it's filtered
-      // Clear state so refresh doesn't stick
+      setShowFilters(true); 
       window.history.replaceState({}, document.title);
     }
   }, [location]);
 
+  // 3. FETCH DATA (Only when session is ready)
   useEffect(() => {
-    fetchEntries();
-  }, []);
+    if (session) {
+      fetchEntries();
+    }
+  }, [session]);
 
   const fetchEntries = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('entries')
       .select('*')
+      .eq('user_id', session.user.id) // <--- 4. THE FIX: Filter by your specific ID
       .order('event_date', { ascending: false });
 
     if (error) console.error(error);
