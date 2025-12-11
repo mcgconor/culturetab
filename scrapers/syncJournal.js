@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
+import { normaliseVenue } from './venueNormaliser.js'; // <--- NEW IMPORT
 
 // 1. ROBUST ENV LOADING
 const __filename = fileURLToPath(import.meta.url);
@@ -18,8 +19,6 @@ const supabase = createClient(
 );
 
 const SCRAPER_NAME = 'Journal_of_Music_Bot_v1';
-
-// DUBLIN KEYWORDS
 const DUBLIN_LOCATIONS = [
   'Dublin', 'Dún Laoghaire', 'Dun Laoghaire', 'Belfield', 'Blackrock', 
   'Tallaght', 'Rathmines', 'Smithfield', 'Temple Bar', 'Phibsborough',
@@ -36,7 +35,6 @@ async function scrapeDeep() {
   console.log(`🗞️  Starting ${SCRAPER_NAME}...`);
   const startTime = Date.now();
 
-  // 3. START LOGGING
   let logId = null;
   const { data: logData, error: logError } = await supabase
     .from('scraper_logs')
@@ -50,7 +48,7 @@ async function scrapeDeep() {
   const eventLinks = [];
 
   try {
-    // STEP 1: GATHER LINKS (Pages 0-2)
+    // STEP 1: GATHER LINKS
     for (let i = 0; i < 3; i++) {
       const url = i === 0 ? baseUrl : `${baseUrl}?page=${i}`;
       console.log(`📄 Scanning List Page ${i + 1}...`);
@@ -71,13 +69,13 @@ async function scrapeDeep() {
           if (isDublin && relativeLink && title) {
             eventLinks.push({
               url: `https://journalofmusic.com${relativeLink}`,
-              venue: venueText,
+              venue: venueText, // We keep raw here for filtering, normalize later
               title: title,
               listImage: listImage
             });
           }
         });
-      } catch (e) { console.error(`List error on page ${i}: ${e.message}`); }
+      } catch (e) { console.error(`List error: ${e.message}`); }
     }
 
     console.log(`\n🔍 Found ${eventLinks.length} Dublin events. Visiting details...`);
@@ -90,25 +88,21 @@ async function scrapeDeep() {
         const html = await res.text();
         const $ = cheerio.load(html);
 
-        // TITLE & DESCRIPTION
         let fullTitle = $('h1#page-title').text().trim() || $('h1.title').text().trim() || link.title;
         let description = $('.field-name-body .field-item').text().trim();
         if (description.length > 600) description = description.substring(0, 600) + '...';
 
-        // DATE
         const dateAttr = $('.date-display-single').attr('content') || $('.date-display-start').attr('content');
         const isoDate = dateAttr ? new Date(dateAttr).toISOString() : new Date().toISOString();
 
-        // IMAGE
         let finalImage = $('.field-name-field-image img').attr('src') || link.listImage;
         if (finalImage && finalImage.startsWith('/')) finalImage = `https://journalofmusic.com${finalImage}`;
 
-        // --- SMART LINK FINDER ---
-        let external_url = link.url; // Default to JoM
+        // Link Finder
+        let external_url = link.url;
         const fieldLink = $('.field-name-field-website a').attr('href') || 
                           $('.field-name-field-booking-url a').attr('href') || 
                           $('.field-name-field-tickets a').attr('href');
-
         const textLink = $('a').filter((i, el) => {
           const t = $(el).text().trim().toLowerCase();
           return t === 'website' || t === 'booking' || t === 'tickets';
@@ -116,31 +110,27 @@ async function scrapeDeep() {
 
         if (textLink) external_url = textLink;
         else if (fieldLink) external_url = fieldLink;
-        // -------------------------
 
         enrichedEvents.push({
           title: fullTitle,
           description: description,
           start_date: isoDate,
-          venue: link.venue,
+          // --- NEW: Apply Normaliser ---
+          venue: normaliseVenue(link.venue),
           image_url: finalImage,
           external_url: external_url, 
-          category: 'concert', // Updated from 'music' to match dashboard standard
+          category: 'concert',
           scraper_source: SCRAPER_NAME
         });
 
-        // Small delay to be polite to the server
         await new Promise(r => setTimeout(r, 200));
 
-      } catch (err) {
-        console.error(`   ❌ Failed to scrape detail: ${link.url}`);
-      }
+      } catch (err) { console.error(`   ❌ Failed to scrape detail: ${link.url}`); }
     }
 
-    // STEP 3: UPSERT (Check for duplicates)
-    console.log(`\n💾 Syncing ${enrichedEvents.length} events to database...`);
+    // STEP 3: UPSERT
+    console.log(`\n💾 Syncing ${enrichedEvents.length} events...`);
     let newCount = 0;
-
     for (const event of enrichedEvents) {
         const { data: existing } = await supabase
             .from('public_events')
@@ -151,17 +141,13 @@ async function scrapeDeep() {
             .single();
 
         if (!existing) {
-            const { error: insertError } = await supabase
-                .from('public_events')
-                .insert([event]);
-            
+            const { error: insertError } = await supabase.from('public_events').insert([event]);
             if (!insertError) newCount++;
         }
     }
 
-    console.log(`🚀 Success! Added ${newCount} new Journal of Music events.`);
+    console.log(`🚀 Success! Added ${newCount} new events.`);
 
-    // 4. SUCCESS LOG
     if (logId) {
         await supabase.from('scraper_logs').update({ 
           status: 'success', 
@@ -171,12 +157,9 @@ async function scrapeDeep() {
     }
 
   } catch (err) {
-    console.error('❌ Global Scrape Failed:', err);
+    console.error('❌ Scrape Failed:', err);
     if (logId) {
-        await supabase.from('scraper_logs').update({ 
-          status: 'error', 
-          error_message: err.message 
-        }).eq('id', logId);
+        await supabase.from('scraper_logs').update({ status: 'error', error_message: err.message }).eq('id', logId);
     }
   }
 }

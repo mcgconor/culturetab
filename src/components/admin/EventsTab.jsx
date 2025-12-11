@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
+import ScraperDocs from './events/ScraperDocs';
 
 // --- SUB-COMPONENT: SCRAPES DASHBOARD ---
 function ScrapesView() {
@@ -18,7 +19,7 @@ function ScrapesView() {
   if (loading) return <div className="p-4 text-gray-400">Loading Logs...</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 border border-gray-200 rounded-xl">
            <h3 className="text-xs font-bold text-gray-400 uppercase">Total Runs</h3>
@@ -105,7 +106,7 @@ function EventTypesView({ events }) {
   }, [events]);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden animate-fade-in">
       <table className="min-w-full text-sm text-left">
         <thead className="bg-gray-50 text-gray-500 font-bold">
           <tr>
@@ -134,57 +135,143 @@ function EventTypesView({ events }) {
   );
 }
 
-// --- SUB-COMPONENT: VENUES LIST ---
-function VenuesView({ events }) {
+// --- SUB-COMPONENT: VENUES MERGE TOOL (UPDATED) ---
+function VenuesView({ events, onRefresh }) {
+  const [selected, setSelected] = useState([]);
+  const [targetName, setTargetName] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
+
+  // 1. Get unique venues and sort them A-Z
   const venues = useMemo(() => {
     const v = events.map(e => e.venue).filter(Boolean);
     return [...new Set(v)].sort();
   }, [events]);
 
+  // 2. Handle Checkbox Toggle
+  const toggleVenue = (venue) => {
+    if (selected.includes(venue)) {
+      setSelected(selected.filter(v => v !== venue));
+    } else {
+      setSelected([...selected, venue]);
+      // If it's the first selection, auto-fill the target name
+      if (selected.length === 0) setTargetName(venue); 
+    }
+  };
+
+  // 3. Handle Merge Action
+  const handleMerge = async () => {
+    if (!targetName) return alert("Please enter a Target Master Name.");
+    if (selected.length === 0) return alert("Please select venues to merge.");
+    if (!window.confirm(`Merge ${selected.length} venues into "${targetName}"? This will update all related events.`)) return;
+
+    setIsMerging(true);
+    
+    // Call our SQL function
+    const { error } = await supabase.rpc('merge_venues', {
+      target_name: targetName,
+      old_names: selected
+    });
+
+    if (error) {
+      alert("Error merging: " + error.message);
+    } else {
+      alert("Success! Venues merged.");
+      setSelected([]);
+      setTargetName('');
+      onRefresh(); // Reload data to show changes
+    }
+    setIsMerging(false);
+  };
+
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-gray-900">Detected Venues ({venues.length})</h3>
+    <div className="bg-white border border-gray-200 rounded-lg p-6 animate-fade-in relative">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="font-bold text-gray-900 text-lg">Venue Cleanup ({venues.length})</h3>
         <button onClick={() => window.print()} className="text-xs font-bold text-blue-600 hover:underline">Print List</button>
       </div>
+
+      {/* STICKY MERGE BAR (Visible when items selected) */}
+      {selected.length > 0 && (
+        <div className="sticky top-0 z-10 bg-indigo-50 border border-indigo-100 p-4 rounded-lg mb-6 shadow-sm flex flex-col md:flex-row gap-4 items-end animate-fade-in">
+          <div className="w-full">
+            <label className="block text-xs font-bold uppercase text-indigo-800 mb-1">
+              Merge {selected.length} selected into Master Name:
+            </label>
+            <input 
+              type="text" 
+              value={targetName} 
+              onChange={(e) => setTargetName(e.target.value)}
+              className="w-full px-3 py-2 border border-indigo-200 rounded bg-white text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g. The Grand Social"
+            />
+          </div>
+          <button 
+            onClick={handleMerge}
+            disabled={isMerging}
+            className="w-full md:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded shadow-sm text-sm transition-colors disabled:opacity-50"
+          >
+            {isMerging ? 'Merging...' : 'Merge Venues'}
+          </button>
+          <button 
+            onClick={() => setSelected([])}
+            className="text-xs text-gray-500 underline self-center md:self-end pb-2 hover:text-gray-800"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* VENUE GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-        {venues.map((venue, i) => (
-          <div key={i} className="p-2 bg-gray-50 rounded border border-gray-100 text-sm text-gray-700">{venue}</div>
-        ))}
+        {venues.map((venue, i) => {
+          const isSelected = selected.includes(venue);
+          return (
+            <div 
+              key={i} 
+              onClick={() => toggleVenue(venue)}
+              className={`
+                p-3 rounded border text-sm cursor-pointer transition-all select-none flex items-center gap-3
+                ${isSelected 
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-md transform scale-[1.02]' 
+                  : 'bg-gray-50 border-gray-100 text-gray-700 hover:bg-gray-100 hover:border-gray-300'}
+              `}
+            >
+              <div className={`w-4 h-4 rounded-sm border flex items-center justify-center bg-white ${isSelected ? 'border-transparent' : 'border-gray-300'}`}>
+                {isSelected && <div className="w-2 h-2 bg-indigo-600 rounded-sm" />}
+              </div>
+              <span className="truncate">{venue}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-// --- SUB-COMPONENT: EVENTS LIST (UPDATED FILTERS) ---
+// --- SUB-COMPONENT: EVENTS LIST ---
 function EventsListView({ events, onDelete }) {
   const [search, setSearch] = useState('');
   const [filterSource, setFilterSource] = useState('');
-  const [showPast, setShowPast] = useState(false); // Default: Hide Past
+  const [showPast, setShowPast] = useState(false);
 
-  // Extract unique sources for the dropdown
   const sources = [...new Set(events.map(e => e.scraper_source).filter(Boolean))];
 
   const filtered = events.filter(e => {
-    // 1. Search Filter
     const matchesSearch = 
       (e.title || '').toLowerCase().includes(search.toLowerCase()) || 
       (e.venue || '').toLowerCase().includes(search.toLowerCase());
     
-    // 2. Source Filter
     const matchesSource = filterSource ? e.scraper_source === filterSource : true;
 
-    // 3. Past Events Filter
     const eventDate = e.start_date ? new Date(e.start_date) : null;
-    const isFuture = eventDate ? eventDate >= new Date().setHours(0,0,0,0) : false; // Compare vs midnight today
+    const isFuture = eventDate ? eventDate >= new Date().setHours(0,0,0,0) : false;
     const matchesTime = showPast ? true : isFuture;
 
     return matchesSearch && matchesSource && matchesTime;
   });
 
   return (
-    <div>
-      {/* FILTERS BAR */}
+    <div className="animate-fade-in">
       <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
         <div className="flex-grow w-full">
           <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Search</label>
@@ -280,17 +367,13 @@ export default function EventsTab() {
 
   const fetchEvents = async () => {
     try {
-      // Fetch data (raw)
       const { data, error } = await supabase.from('public_events').select('*');
       if (error) throw error;
-
-      // Safe Sort
       const sorted = (data || []).sort((a, b) => {
         const dateA = a.start_date ? new Date(a.start_date) : new Date(8640000000000000);
         const dateB = b.start_date ? new Date(b.start_date) : new Date(8640000000000000);
         return dateA - dateB;
       });
-
       setEvents(sorted);
     } catch (err) {
       console.error("Fetch Error:", err);
@@ -306,10 +389,11 @@ export default function EventsTab() {
   };
 
   const SUB_TABS = [
-    { id: 'scrapes', label: 'Scrapes' },
-    { id: 'types', label: 'Event Types' },
+    { id: 'scrapes', label: 'Run Logs' },
+    { id: 'scrapers', label: 'Scraper Docs' },
+    { id: 'types', label: 'Stats' },
     { id: 'events', label: 'All Events' },
-    { id: 'venues', label: 'Venues List' },
+    { id: 'venues', label: 'Cleanup Venues' }, // Renamed to indicate action
   ];
 
   if (loading) return <div className="p-6 text-gray-400">Loading Events Data...</div>;
@@ -317,23 +401,28 @@ export default function EventsTab() {
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold text-gray-900 mb-6">Event Management</h2>
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit overflow-x-auto">
         {SUB_TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
-              activeSubTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            className={`px-4 py-2 text-sm font-bold rounded-md transition-all whitespace-nowrap ${
+              activeSubTab === tab.id 
+                ? 'bg-white text-black shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {tab.label}
           </button>
         ))}
       </div>
+
       {activeSubTab === 'scrapes' && <ScrapesView />}
+      {activeSubTab === 'scrapers' && <ScraperDocs />} 
       {activeSubTab === 'types' && <EventTypesView events={events} />}
       {activeSubTab === 'events' && <EventsListView events={events} onDelete={handleDelete} />}
-      {activeSubTab === 'venues' && <VenuesView events={events} />}
+      {/* Pass onRefresh so the list updates after a merge */}
+      {activeSubTab === 'venues' && <VenuesView events={events} onRefresh={fetchEvents} />}
     </div>
   );
 }
