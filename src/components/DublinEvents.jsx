@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
-
-const TM_API_KEY = import.meta.env.VITE_TICKETMASTER_KEY;
-
-const CULTURE_IDS = [
-  'KZFzniwnSyZfZ7v7nJ', // Music
-  'KZFzniwnSyZfZ7v7na', // Arts & Theatre
-  'KZFzniwnSyZfZ7v7nE'  // Film
-].join(',');
 
 export default function DublinEvents() {
   const [events, setEvents] = useState([]);
@@ -15,83 +8,80 @@ export default function DublinEvents() {
 
   useEffect(() => {
     const fetchEvents = async () => {
-      try {
-        const response = await fetch(
-          `https://app.ticketmaster.com/discovery/v2/events.json?city=Dublin&classificationId=${CULTURE_IDS}&sort=date,asc&size=20&apikey=${TM_API_KEY}`
-        );
-        const data = await response.json();
-        const upcoming = data._embedded?.events?.slice(0, 5) || [];
-        setEvents(upcoming);
-      } catch (error) {
-        console.error('Failed to fetch events', error);
-      } finally {
-        setLoading(false);
-      }
+      // Logic: Show next 5 events starting from right now
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('public_events')
+        .select('*')
+        .gte('start_date', now)
+        .order('start_date', { ascending: true })
+        .limit(5);
+
+      if (!error) setEvents(data);
+      setLoading(false);
     };
 
     fetchEvents();
   }, []);
 
-  if (loading) return null; 
+  if (loading) return <div className="animate-pulse h-24 bg-gray-100 rounded-xl mb-8"></div>;
   if (events.length === 0) return null;
 
   return (
     <div className="mb-12 animate-fade-in">
-      <div className="flex justify-between items-end mb-4 border-b border-gray-100 pb-2">
+      
+      {/* HEADER: Matches screenshot "Upcoming in Dublin" + "View All ->" */}
+      <div className="flex justify-between items-end mb-4">
         <h2 className="text-xl font-bold text-gray-900">Upcoming in Dublin</h2>
-        <Link to="/events" className="text-sm font-bold text-gray-400 hover:text-black transition-colors">
+        <Link to="/events" className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-1">
           View All →
         </Link>
       </div>
-      
-      <div className="space-y-3">
+
+      {/* LIST */}
+      <div className="flex flex-col gap-3">
         {events.map((event) => {
-          const date = new Date(event.dates.start.localDate);
-          const month = date.toLocaleString('default', { month: 'short' });
-          const day = date.getDate();
-          
-          // TIME FORMATTING (e.g., "19:30" -> "7:30 PM")
-          let timeString = '';
-          if (event.dates.start.localTime) {
-            const [hours, minutes] = event.dates.start.localTime.split(':');
-            const time = new Date();
-            time.setHours(hours);
-            time.setMinutes(minutes);
-            timeString = time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-          }
-          
+          const dateObj = new Date(event.start_date);
+          const month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase(); // "DEC"
+          const day = dateObj.getDate(); // "10"
+          const timeStr = dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' }); // "19:00"
+
           return (
-            // LINK INTERNAL NOW
             <Link 
               key={event.id} 
               to={`/event/${event.id}`}
-              className="group flex items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-black transition-all duration-200"
+              className="group bg-white border border-gray-200 rounded-xl p-4 hover:border-black transition-all flex items-center shadow-sm"
             >
-              {/* DATE COLUMN */}
-              <div className="flex-shrink-0 w-12 text-center">
-                <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider">{month}</div>
-                <div className="text-xl font-black text-gray-900 leading-none">{day}</div>
-              </div>
-              
-              <div className="w-px h-8 bg-gray-100"></div>
-
-              {/* CONTENT */}
-              <div className="flex-grow min-w-0">
-                <h3 className="font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                  {event.name}
-                </h3>
-                <div className="flex items-center gap-2 text-xs text-gray-500 truncate">
-                  <span>{event._embedded?.venues?.[0]?.name}</span>
-                  {timeString && (
-                    <>
-                      <span className="text-gray-300">•</span>
-                      <span>{timeString}</span>
-                    </>
-                  )}
+              {/* 1. DATE BLOCK (Left Side) */}
+              <div className="flex-shrink-0 w-12 text-center mr-4">
+                <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-0.5">
+                  {month}
+                </div>
+                <div className="text-2xl font-black text-gray-900 leading-none">
+                  {day}
                 </div>
               </div>
 
-              <div className="text-gray-300 group-hover:text-black transition-colors">→</div>
+              {/* VERTICAL DIVIDER */}
+              <div className="w-px h-10 bg-gray-100 mr-4 hidden sm:block"></div>
+
+              {/* 2. CONTENT (Middle) */}
+              <div className="flex-grow min-w-0">
+                <h3 className="font-bold text-gray-900 text-lg leading-tight truncate group-hover:text-blue-600 transition-colors">
+                  {event.title}
+                </h3>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+                  <span>{event.venue}</span>
+                  <span className="text-gray-300">•</span>
+                  <span>{timeStr}</span>
+                </div>
+              </div>
+
+              {/* 3. ARROW (Right Side) */}
+              <div className="text-gray-300 group-hover:text-black transition-colors pl-4">
+                →
+              </div>
             </Link>
           );
         })}

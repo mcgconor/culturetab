@@ -23,10 +23,13 @@ export default function Events() {
     const fetchAllEvents = async () => {
       setLoading(true);
       try {
+        // Get start of today (YYYY-MM-DD) to ensure we see today's events
+        const todayStr = new Date().toISOString().split('T')[0];
+
         const { data, error } = await supabase
           .from('public_events')
           .select('*')
-          .gte('start_date', new Date().toISOString())
+          .gte('start_date', todayStr) // <--- CHANGED THIS
           .order('start_date', { ascending: true })
           .limit(500);
 

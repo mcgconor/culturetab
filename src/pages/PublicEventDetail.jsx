@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-
-const TM_API_KEY = import.meta.env.VITE_TICKETMASTER_KEY;
+import { supabase } from '../supabaseClient';
 
 export default function PublicEventDetail() {
   const { id } = useParams();
@@ -10,132 +9,158 @@ export default function PublicEventDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchEventDetails = async () => {
-      try {
-        const response = await fetch(
-          `https://app.ticketmaster.com/discovery/v2/events/${id}.json?apikey=${TM_API_KEY}`
-        );
-        const data = await response.json();
+    const fetchEvent = async () => {
+      // Fetch the specific event by ID
+      const { data, error } = await supabase
+        .from('public_events')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching event:", error);
+      } else if (data) {
         setEvent(data);
-      } catch (error) {
-        console.error('Error fetching event details:', error);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
-    fetchEventDetails();
+
+    if (id) fetchEvent();
   }, [id]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-pulse text-gray-400 font-bold">Loading Event...</div></div>;
-  if (!event) return <div className="min-h-screen flex items-center justify-center">Event not found</div>;
-
-  // Format Data
-  const img = event.images.find(i => i.width > 600)?.url || event.images[0].url;
-  const dateObj = new Date(event.dates.start.localDate);
-  const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  if (loading) return <div className="p-12 text-center text-gray-400">Loading details...</div>;
   
-  let timeStr = '';
-  if (event.dates.start.localTime) {
-    const [h, m] = event.dates.start.localTime.split(':');
-    const d = new Date(); d.setHours(h); d.setMinutes(m);
-    timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (!event) return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Event Not Found</h2>
+      <button onClick={() => navigate('/events')} className="text-blue-600 font-bold hover:underline">
+        Back to Calendar
+      </button>
+    </div>
+  );
+
+  // Date Formatting (Safe)
+  let dateStr = "Date TBA";
+  let timeStr = "Time TBA";
+  let dayNum = "?";
+  let monthStr = "";
+  
+  if (event.start_date) {
+    const dateObj = new Date(event.start_date);
+    if (!isNaN(dateObj)) {
+      dateStr = dateObj.toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+      timeStr = dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' });
+      dayNum = dateObj.getDate();
+      monthStr = dateObj.toLocaleString('default', { month: 'short' });
+    }
   }
 
-  const venue = event._embedded?.venues?.[0];
+  // --- BUTTON TEXT LOGIC (Fixed for Safety) ---
+  let buttonText = 'View Event';
+  const url = event.external_url || ''; // Safe Fallback to empty string
+
+  if (event.source === 'ticketmaster') {
+    buttonText = 'Get Tickets on Ticketmaster';
+  } else if (event.source === 'journalofmusic') {
+    // Check if the URL exists AND contains the journal domain
+    if (url && url.includes('journalofmusic.com')) {
+      buttonText = 'Read on Journal of Music';
+    } else {
+      buttonText = 'Visit Website';
+    }
+  }
+  // ---------------------------------------------
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-8 px-4 animate-fade-in">
       
-      {/* Back Button */}
-      <div className="max-w-3xl mx-auto mb-6">
-        <button onClick={() => navigate(-1)} className="text-sm font-bold text-gray-400 hover:text-black transition-colors">
-          ← Back
+      {/* NAV */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <button 
+          onClick={() => navigate('/events')} 
+          className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-2"
+        >
+          ← Back to Calendar
         </button>
       </div>
 
-      <article className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fade-in-up">
+      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         
-        {/* HERO IMAGE */}
-        <div className="h-64 sm:h-96 w-full bg-gray-200 relative">
-          <img src={img} alt={event.name} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+        <div className="flex flex-col md:flex-row">
           
-          <div className="absolute bottom-6 left-6 right-6 text-white">
-            <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur rounded-full text-xs font-bold uppercase tracking-widest mb-3 border border-white/30">
-              {event.classifications?.[0]?.segment?.name || 'Event'}
-            </span>
-            <h1 className="text-3xl sm:text-5xl font-black leading-tight shadow-sm">
-              {event.name}
-            </h1>
+          {/* IMAGE SECTION */}
+          <div className="md:w-2/5 h-64 md:h-auto bg-gray-100 relative">
+            {event.image_url ? (
+              <img 
+                src={event.image_url} 
+                alt={event.title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+                onError={(e) => { e.target.style.display = 'none'; }} // Hide if broken
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-300 font-bold text-2xl uppercase">
+                {event.category || 'Event'}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* DETAILS SECTION */}
-        <div className="p-8">
-          <div className="flex flex-col md:flex-row gap-10">
-            
-            {/* Left: Info */}
-            <div className="flex-grow space-y-6">
+          {/* CONTENT SECTION */}
+          <div className="md:w-3/5 p-6 md:p-8 flex flex-col justify-between">
+            <div>
+              {/* Category Pill */}
+              <span className="inline-block px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-4">
+                {event.category || 'Event'}
+              </span>
+
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-tight mb-2">
+                {event.title}
+              </h1>
               
-              {/* Date & Time */}
-              <div className="flex items-start gap-4">
-                <div className="w-10 pt-1 text-center text-2xl">📅</div>
+              <div className="text-lg font-bold text-gray-500 mb-6 flex items-center gap-2">
+                📍 {event.venue}
+              </div>
+
+              {/* Date Box */}
+              <div className="flex items-center gap-4 py-4 border-y border-gray-100 mb-6">
+                <div className="text-center px-2">
+                   <div className="text-xs font-bold text-red-600 uppercase">{monthStr}</div>
+                   <div className="text-2xl font-black text-gray-900 leading-none">{dayNum}</div>
+                </div>
+                <div className="h-8 w-px bg-gray-100"></div>
                 <div>
-                  <h3 className="font-bold text-gray-900 text-lg">Date & Time</h3>
-                  <p className="text-gray-600">{dateStr}</p>
-                  {timeStr && <p className="text-gray-500">{timeStr}</p>}
+                   <div className="text-sm font-bold text-gray-900">{dateStr}</div>
+                   <div className="text-xs text-gray-500">{timeStr !== '00:00' ? `Doors: ${timeStr}` : 'Time TBA'}</div>
                 </div>
               </div>
 
-              {/* Venue */}
-              <div className="flex items-start gap-4">
-                <div className="w-10 pt-1 text-center text-2xl">📍</div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-lg">Location</h3>
-                  <p className="text-gray-600">{venue?.name}</p>
-                  <p className="text-gray-500 text-sm">
-                    {venue?.address?.line1}, {venue?.city?.name}
-                  </p>
-                </div>
-              </div>
-
-              {/* Description (if available) */}
-              {event.info && (
-                <div className="pt-4 border-t border-gray-100 mt-6">
-                  <h3 className="font-bold text-gray-900 mb-2">About</h3>
-                  <p className="text-gray-600 leading-relaxed">{event.info}</p>
+              {/* Description */}
+              {event.description && (
+                <div className="prose prose-sm prose-gray max-w-none text-gray-600 mb-8 leading-relaxed whitespace-pre-wrap">
+                  {event.description}
                 </div>
               )}
             </div>
 
-            {/* Right: Action Box */}
-            <div className="md:w-72 flex-shrink-0">
-              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 sticky top-6">
-                <div className="text-center mb-6">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Status</p>
-                  <p className={`font-bold ${event.dates.status.code === 'onsale' ? 'text-green-600' : 'text-red-600'}`}>
-                    {event.dates.status.code === 'onsale' ? 'Tickets Available' : 'Sold Out / Unavailable'}
-                  </p>
-                </div>
-
+            {/* ACTION BUTTON */}
+            {event.external_url && (
+              <div className="mt-4 pt-6 border-t border-gray-50">
                 <a 
-                  href={event.url} 
+                  href={event.external_url} 
                   target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block w-full bg-black text-white font-bold text-center py-4 rounded-xl hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]"
+                  rel="noreferrer"
+                  className="block w-full text-center bg-black text-white h-12 leading-[48px] rounded-xl font-bold hover:bg-gray-800 transition-colors"
                 >
-                  Get Tickets ↗
+                  {buttonText} →
                 </a>
-                
-                <p className="text-center text-[10px] text-gray-400 mt-4">
-                  You will be redirected to the ticket provider.
+                <p className="text-center text-[10px] text-gray-300 mt-2">
+                  Sourced from {event.source}
                 </p>
               </div>
-            </div>
-
+            )}
           </div>
         </div>
-      </article>
+      </div>
     </div>
   );
 }
