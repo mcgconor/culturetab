@@ -31,7 +31,7 @@ export default function DublinEvents() {
   return (
     <div className="mb-12 animate-fade-in">
       
-      {/* HEADER: Matches screenshot "Upcoming in Dublin" + "View All ->" */}
+      {/* HEADER */}
       <div className="flex justify-between items-end mb-4">
         <h2 className="text-xl font-bold text-gray-900">Upcoming in Dublin</h2>
         <Link to="/events" className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-1">
@@ -43,9 +43,9 @@ export default function DublinEvents() {
       <div className="flex flex-col gap-3">
         {events.map((event) => {
           const dateObj = new Date(event.start_date);
-          const month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase(); // "DEC"
-          const day = dateObj.getDate(); // "10"
-          const timeStr = dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' }); // "19:00"
+          const month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase(); 
+          const day = dateObj.getDate(); 
+          const timeStr = dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' });
 
           return (
             <Link 
@@ -78,9 +78,12 @@ export default function DublinEvents() {
                 </div>
               </div>
 
-              {/* 3. ARROW (Right Side) */}
-              <div className="text-gray-300 group-hover:text-black transition-colors pl-4">
-                →
+              {/* 3. ACTION (Right Side) - STANDARDIZED */}
+              <div className="pl-4 flex-shrink-0">
+                 <div className="text-xs font-bold text-gray-400 uppercase tracking-wider group-hover:text-black transition-colors flex items-center gap-1">
+                    <span className="hidden sm:inline">More Information</span>
+                    <span className="text-lg leading-none mb-0.5">→</span>
+                 </div>
               </div>
             </Link>
           );

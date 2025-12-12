@@ -20,6 +20,7 @@ const VENUE_MAPPINGS = {
     "Civic Theatre Tallaght": "Civic Theatre",
     "Irish Film Institute (IFI)": "Irish Film Institute",
     "Irish Film Institute": "Irish Film Institute",
+    "Upstairs at Whelans": "Whelan's"
 };
 
 export function normaliseVenue(rawName) {

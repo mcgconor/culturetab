@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { ExternalLink } from 'lucide-react'; 
 
 export default function PublicEventDetail() {
   const { id } = useParams();
@@ -39,7 +40,7 @@ export default function PublicEventDetail() {
     </div>
   );
 
-  // Date Formatting (Safe)
+  // Date Formatting
   let dateStr = "Date TBA";
   let timeStr = "Time TBA";
   let dayNum = "?";
@@ -55,21 +56,65 @@ export default function PublicEventDetail() {
     }
   }
 
-  // --- BUTTON TEXT LOGIC (Fixed for Safety) ---
-  let buttonText = 'View Event';
-  const url = event.external_url || ''; // Safe Fallback to empty string
+  // --- HELPER: DOMAIN MAPPING (Clean & Pretty) ---
+  const getDomainDisplayName = (url) => {
+    try {
+      let hostname = new URL(url).hostname;
+      
+      // 1. Strip 'www.'
+      hostname = hostname.replace(/^www\./, '');
 
-  if (event.source === 'ticketmaster') {
-    buttonText = 'Get Tickets on Ticketmaster';
-  } else if (event.source === 'journalofmusic') {
-    // Check if the URL exists AND contains the journal domain
-    if (url && url.includes('journalofmusic.com')) {
-      buttonText = 'Read on Journal of Music';
-    } else {
-      buttonText = 'Visit Website';
+      // 2. "Nice Name" Mapping for major venues
+      const domainMap = {
+        'nch.ie': 'National Concert Hall',
+        'eventbrite.ie': 'Eventbrite',
+        'eventbrite.com': 'Eventbrite',
+        'tickets.ie': 'Tickets.ie',
+        'bordgaisenergytheatre.ie': 'Bord Gáis Energy Theatre',
+        '3arena.ie': '3Arena',
+        'olympia.ie': '3Olympia Theatre',
+        'whelanslive.com': "Whelan's",
+        'vicarstreet.ie': 'Vicar Street',
+        'sugarclubtickets.ie': 'The Sugar Club'
+      };
+
+      if (domainMap[hostname]) return domainMap[hostname];
+
+      // 3. Subdomain Stripping Logic (The "RIAM" Fix)
+      // If we have 3+ parts (e.g. tickets.riam.ie), try to grab just the root domain.
+      const parts = hostname.split('.');
+      if (parts.length > 2) {
+          // This is a safe heuristic for .ie and .com domains
+          // e.g. "tickets.riam.ie" -> "riam.ie"
+          return parts.slice(-2).join('.');
+      }
+
+      return hostname;
+    } catch (e) {
+      return 'External Site';
     }
-  }
-  // ---------------------------------------------
+  };
+
+  // --- HELPER: SOURCE LABEL LOGIC ---
+  const getSourceLabel = (source, url) => {
+    if (!source) return 'External Source';
+    const s = source.toLowerCase();
+    
+    // 1. Reliable/Direct Sources
+    if (s.includes('ticketmaster')) return 'Ticketmaster';
+    if (s.includes('ifi')) return 'Irish Film Institute';
+    
+    // 2. Journal of Music (Deep Dive)
+    // If it's a Journal event, we prefer to show the DESTINATION domain, not "The Journal"
+    if (s.includes('journal')) {
+        if (url && !url.includes('journalofmusic.com')) {
+            return getDomainDisplayName(url);
+        }
+        return 'The Journal of Music';
+    }
+    
+    return source; // Fallback
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 animate-fade-in">
@@ -149,12 +194,15 @@ export default function PublicEventDetail() {
                   href={event.external_url} 
                   target="_blank" 
                   rel="noreferrer"
-                  className="block w-full text-center bg-black text-white h-12 leading-[48px] rounded-xl font-bold hover:bg-gray-800 transition-colors"
+                  className="w-full bg-black text-white h-14 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 transform active:scale-[0.98]"
                 >
-                  {buttonText} →
+                  <span>More Information</span>
+                  <ExternalLink className="w-4 h-4" />
                 </a>
-                <p className="text-center text-[10px] text-gray-300 mt-2">
-                  Sourced from {event.source}
+                
+                {/* Clean Source Label */}
+                <p className="text-center text-[10px] text-gray-400 font-medium uppercase tracking-wider mt-3">
+                  Sourced from {getSourceLabel(event.scraper_source || event.source, event.external_url)}
                 </p>
               </div>
             )}
