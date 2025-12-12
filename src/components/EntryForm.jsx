@@ -13,10 +13,15 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     event_date: new Date().toISOString().split('T')[0],
     image_url: '' 
   });
+  
+  // Controls whether we show the API search or the standard text input
+  const [manualEntryMode, setManualEntryMode] = useState(false);
 
+  // If editing, load data and defaulting to manual mode
   useEffect(() => {
     if (entryToEdit) {
       setFormData(entryToEdit);
+      setManualEntryMode(true); 
     }
   }, [entryToEdit]);
 
@@ -32,6 +37,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
       title: '', kind: 'book', rating: 5, creator: '', reflection: '',
       event_date: new Date().toISOString().split('T')[0], image_url: ''
     });
+    setManualEntryMode(false);
   };
 
   const handleChange = (e) => {
@@ -42,6 +48,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     setFormData({ ...formData, rating: newRating });
   };
   
+  // Called when API search is successful
   const handleAutoSelect = (selection) => {
     setFormData(prev => ({
       ...prev,
@@ -50,6 +57,21 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
       image_url: selection.image_url,
       event_date: prev.event_date 
     }));
+  };
+
+  // Called when user clicks "(X) Title Not Found"
+  const handleManualBypass = (currentTitle) => {
+    setFormData(prev => ({
+        ...prev,
+        title: currentTitle // Save what they typed
+    }));
+    setManualEntryMode(true); // Switch to dumb input
+  };
+
+  // When category changes, reset to search mode
+  const handleCategoryChange = (newKind) => {
+    setFormData({ ...formData, kind: newKind, title: '', creator: '', image_url: '' });
+    setManualEntryMode(false);
   };
 
   const getCreatorLabel = (kind) => {
@@ -61,7 +83,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     return 'Creator';
   };
 
-  // CATEGORY ICONS CONFIG
   const categories = [
     { id: 'book', label: 'Book', icon: '📖' },
     { id: 'film', label: 'Film', icon: '🎬' },
@@ -70,7 +91,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     { id: 'exhibition', label: 'Art', icon: '🖼️' },
   ];
 
-  // STYLES
   const labelClass = "block text-[10px] font-bold uppercase text-gray-400 mb-1.5 ml-1";
   const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
 
@@ -85,7 +105,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
 
       <form onSubmit={handleSubmit} className="space-y-6">
         
-        {/* ROW 1: CATEGORY SELECTION (Icon Bar) */}
+        {/* ROW 1: CATEGORY SELECTION */}
         <div>
           <label className={labelClass}>Category</label>
           <div className="grid grid-cols-5 gap-2">
@@ -95,7 +115,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, kind: cat.id })}
+                  onClick={() => handleCategoryChange(cat.id)}
                   className={`
                     h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 border
                     ${isActive 
@@ -112,20 +132,24 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           </div>
         </div>
 
-        {/* ROW 2: TITLE (Context aware) */}
+        {/* ROW 2: TITLE (Logic Switcher) */}
         <div>
           <label className={labelClass}>Title</label>
-          {formData.kind === 'film' ? (
+          
+          {!manualEntryMode && formData.kind === 'film' ? (
             <MovieSearch 
               initialTitle={formData.title} 
               onSelectMovie={handleAutoSelect} 
+              onManualBypass={handleManualBypass}
             />
-          ) : formData.kind === 'book' ? (
+          ) : !manualEntryMode && formData.kind === 'book' ? (
             <BookSearch 
               initialTitle={formData.title} 
               onSelectBook={handleAutoSelect} 
+              onManualBypass={handleManualBypass}
             />
           ) : (
+            // STANDARD TEXT INPUT (Fallback or Manual Mode)
             <input
               name="title"
               type="text"
@@ -134,7 +158,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               onChange={handleChange}
               className={inputClass}
               required
-              autoFocus
+              autoFocus={manualEntryMode} // Focus here if we just switched to it
+              // REMOVED onBlur HERE - It was causing the bug!
             />
           )}
         </div>
@@ -161,7 +186,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           </div>
         </div>
 
-        {/* ROW 4: CREATOR (Full Width) */}
+        {/* ROW 4: CREATOR */}
         <div>
           <label className={labelClass}>{getCreatorLabel(formData.kind)}</label>
           <input 
