@@ -1,137 +1,154 @@
 import React from 'react';
-import { MapPin, Calendar, Star, Plus, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ExternalLink, Plus, Edit2, Trash2, MapPin, Star } from 'lucide-react';
 
-/**
- * UNIVERSAL CARD
- * Handles both "Public Events" and "User Entries".
- * * @param {Object} item - The data object (entry or public event)
- * @param {String} type - 'public' or 'entry' (Determines the footer actions)
- * @param {String} variant - 'full' (Feed) or 'snippet' (Widget)
- * @param {Function} onLog - Callback when user clicks "+" on a public event
- */
-export default function UniversalCard({ item, type = 'public', variant = 'full', onLog }) {
-  
-  // 1. NORMALIZE DATA
-  // Different sources might have different field names. We map them here.
+// --- HELPERS (Can be moved to a separate utils file later) ---
+function getCreatorLabel(cat) {
+    if (cat === 'book') return 'Written by';
+    if (cat === 'film') return 'Directed by';
+    if (cat === 'concert' || cat === 'music') return 'Performed by';
+    return 'By';
+}
+
+function getCategoryColor(cat) {
+    if (cat.includes('book')) return 'bg-blue-100 text-blue-800';
+    if (cat.includes('film')) return 'bg-red-100 text-red-800';
+    if (cat.includes('concert') || cat.includes('music')) return 'bg-purple-100 text-purple-800';
+    if (cat.includes('theatre') || cat.includes('arts')) return 'bg-amber-100 text-amber-800';
+    if (cat.includes('exhibition')) return 'bg-emerald-100 text-emerald-800';
+    return 'bg-gray-100 text-gray-800';
+}
+// -----------------------------------------------------------
+
+export default function UniversalCard({ item, type = 'public', onAction, onDelete }) {
+  const navigate = useNavigate();
+
+  // --- DATA NORMALIZATION ---
   const title = item.title;
-  const venue = item.venue || 'Unknown Venue';
-  const image = item.image_url || 'https://via.placeholder.com/400x300?text=No+Image'; // Fallback
-  const date = new Date(item.start_date || item.created_at).toLocaleDateString('en-IE', {
-    month: 'short', day: 'numeric'
-  });
-  const category = item.category || 'Event';
-  const rating = item.rating || 0; // Only for entries
+  const id = item.id;
+  const rawCategory = item.kind || item.category || 'event';
+  const category = rawCategory.toLowerCase();
+  
+  const rawDate = item.start_date || item.event_date || item.created_at;
+  const dateObj = rawDate ? new Date(rawDate) : null;
+  
+  const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toLocaleDateString('en-IE', {day: 'numeric', month: '2-digit', year: 'numeric'}) : 'TBA';
+  const timeStr = dateObj && !isNaN(dateObj) ? dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' }) : '';
+  const month = dateObj && !isNaN(dateObj) ? dateObj.toLocaleString('default', { month: 'short' }).toUpperCase() : '---';
+  const day = dateObj && !isNaN(dateObj) ? dateObj.getDate() : '--';
 
-  // --- VARIANT 1: SNIPPET (Compact Row) ---
-  if (variant === 'snippet') {
-    return (
-      <div className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-gray-100">
-        {/* Tiny Image */}
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-12 h-12 rounded-md object-cover flex-shrink-0 bg-gray-200"
-        />
+  const subtitle = type === 'entry' ? item.creator : item.venue;
+  const subtitleLabel = type === 'entry' ? getCreatorLabel(category) : null; 
+  const rating = item.rating || 0;
+
+
+  // --- RENDER ---
+  return (
+    <div 
+      onClick={() => navigate(type === 'entry' ? `/entry/${id}` : `/event/${id}`)}
+      className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex gap-4 sm:gap-5"
+    >
+      
+      {/* 1. LEFT: DATE BLOCK (Strong Visual Element) */}
+      <div className="flex-shrink-0 w-20 h-28 sm:w-24 sm:h-32 bg-gray-50 rounded-lg border border-gray-100 flex flex-col items-center justify-center text-center p-2">
+        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">{month}</span>
+        <span className="text-3xl font-black text-gray-900 leading-none my-1">{day}</span>
+        <span className="text-[10px] text-gray-400 font-medium">{timeStr}</span>
+      </div>
+
+      {/* 2. MIDDLE: CONTENT & ACTIONS (Uses flex-grow/flex-col/justify-between) */}
+      <div className="flex-grow flex flex-col justify-between py-0.5 min-w-0">
         
-        {/* Compact Text */}
-        <div className="min-w-0 flex-1">
-          <h4 className="text-sm font-bold text-gray-900 truncate">{title}</h4>
-          <div className="flex items-center text-xs text-gray-500 mt-0.5">
-            <span className="truncate max-w-[120px]">{venue}</span>
+        {/* TOP CONTENT BLOCK: Title, Subtitle, Date/Time */}
+        <div> 
+          
+          {/* Header Row: Title and Metadata Block */}
+          <div className="flex justify-between items-start gap-2 mb-1">
+            <h3 className="font-black text-lg text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors pr-2">
+              {title}
+            </h3>
+            
+            {/* --- METADATA BLOCK (TOP RIGHT) --- */}
+            <div className="flex-shrink-0 flex flex-col items-end pt-1"> 
+                
+                {/* 1. Category Lozenges */}
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide border border-transparent ${getCategoryColor(category)} mb-0.5`}>
+                  {category}
+                </span>
+
+                {/* 2. Rating Stars (Entries ONLY) */}
+                {type === 'entry' && (
+                  <div className="flex gap-0.5 text-xs">
+                     {[...Array(5)].map((_, i) => (
+                       <Star key={i} className={`w-3 h-3 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
+                     ))}
+                  </div>
+                )}
+            </div>
+            {/* ---------------------------------- */}
+          </div>
+
+          {/* Subtitle (Director or Venue) */}
+          <div className="mb-2">
+             {subtitleLabel && (
+               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
+                 {subtitleLabel}
+               </p>
+             )}
+             <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700 line-clamp-1">
+                {type === 'public' && <MapPin className="w-3.5 h-3.5 text-gray-400" />}
+                {subtitle || 'Unknown'}
+             </div>
+          </div>
+          
+          {/* Date Row (The data point the user is looking for) */}
+          <div className="text-xs font-bold text-gray-500">
+             {type === 'public' && <span>{dateStr} at {timeStr}</span>}
+             {type === 'entry' && <span className="text-xs font-bold text-gray-400">Logged on {dateStr}</span>}
           </div>
         </div>
-
-        {/* Date or Rating */}
-        <div className="text-right flex-shrink-0">
-          {type === 'entry' && rating > 0 ? (
-            <div className="flex text-yellow-400 text-xs">★ {rating}</div>
-          ) : (
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{date}</span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // --- VARIANT 2: FULL (Feed Card) ---
-  return (
-    <div className="group bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full">
-      
-      {/* IMAGE HEADER */}
-      <div className="relative h-48 overflow-hidden bg-gray-100">
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
         
-        {/* Floating Badges */}
-        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-black text-xs font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-1">
-          <Calendar className="w-3 h-3" />
-          {date}
-        </div>
-        <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md">
-          {category}
-        </div>
-      </div>
-
-      {/* BODY */}
-      <div className="p-4 flex flex-col flex-grow">
-        <h3 className="font-bold text-gray-900 text-lg leading-tight mb-2 line-clamp-2">
-          {title}
-        </h3>
-        
-        <div className="flex items-start gap-1.5 text-gray-500 text-sm mb-4">
-          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          <span className="line-clamp-1">{venue}</span>
-        </div>
-
-        {/* FOOTER ACTION BAR */}
-        <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
+        {/* 3. BOTTOM ROW: ACTIONS - Pushed to the bottom */}
+        <div className="mt-3 pt-2 border-t border-gray-50 flex justify-end gap-3">
           
-          {/* Left Side: Context Specific Info */}
           {type === 'entry' ? (
-             // ENTRY MODE: Show Rating
-             <div className="flex gap-0.5">
-               {[1, 2, 3, 4, 5].map((star) => (
-                 <Star 
-                   key={star} 
-                   className={`w-4 h-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-                 />
-               ))}
-             </div>
+            // ENTRY ACTIONS 
+            <>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
+                className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+              >
+                <Edit2 className="w-3 h-3" /> Edit
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onDelete && onDelete(item.id); }}
+                className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-red-600 transition-colors"
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            </>
           ) : (
-             // PUBLIC MODE: Show "Get Tickets" or Source
-             <a 
-               href={item.external_url} 
-               target="_blank" 
-               rel="noreferrer"
-               className="flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-blue-600 transition-colors"
-               onClick={(e) => e.stopPropagation()}
-             >
-               <ExternalLink className="w-3 h-3" />
-               {item.scraper_source ? 'Tickets / Info' : 'Details'}
-             </a>
+            // PUBLIC ACTIONS
+            <>
+              {item.external_url && (
+                <a 
+                  href={item.external_url} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> More Info
+                </a>
+              )}
+              <button 
+                onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
+                className="flex items-center gap-1 bg-black text-white text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-transform active:scale-95 shadow-sm ml-2"
+              >
+                <Plus className="w-3 h-3" /> Log This
+              </button>
+            </>
           )}
-
-          {/* Right Side: Primary Action */}
-          {type === 'public' && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                onLog && onLog(item);
-              }}
-              className="flex items-center gap-1.5 bg-black text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-colors shadow-sm"
-            >
-              <Plus className="w-3 h-3" />
-              Log This
-            </button>
-          )}
-          
-          {type === 'entry' && (
-             <span className="text-xs font-medium text-gray-400">Logged</span>
-          )}
-
         </div>
       </div>
     </div>

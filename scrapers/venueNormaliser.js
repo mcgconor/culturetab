@@ -18,6 +18,8 @@ const VENUE_MAPPINGS = {
     "Whelans": "Whelan's",
     "Whelan’s": "Whelan's", // catching the curly apostrophe
     "Civic Theatre Tallaght": "Civic Theatre",
+    "Irish Film Institute (IFI)": "Irish Film Institute",
+    "Irish Film Institute": "Irish Film Institute",
 };
 
 export function normaliseVenue(rawName) {

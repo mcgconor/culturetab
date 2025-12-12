@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'node-fetch'; 
+import { normaliseVenue } from './venueNormaliser.js'; // <--- IMPORT IS HERE
 
 // 1. ROBUST ENV LOADING
 const __filename = fileURLToPath(import.meta.url);
@@ -79,6 +80,10 @@ async function scrapeIFI() {
 
   if (!logError) logId = logData.id;
 
+  // --- HARDCODED CANONICAL VENUE ---
+  const IFI_CANONICAL_VENUE = normaliseVenue("Irish Film Institute (IFI)"); 
+  // This calls the normaliser once and uses the cleaned name (e.g., "Irish Film Institute")
+  
   try {
     const response = await fetch(`${IFI_BASE_URL}/weekly-schedule`);
     const html = await response.text();
@@ -86,7 +91,7 @@ async function scrapeIFI() {
 
     let currentDayDateStr = null;
     const screenings = [];
-    const titlesToEnrich = new Set(); // To track unique titles for TMDB lookup
+    const titlesToEnrich = new Set(); 
 
     const dateRegex = /(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)/i;
 
@@ -130,12 +135,13 @@ async function scrapeIFI() {
                 screenings.push({
                     title: title,
                     start_date: fullDateTime,
-                    venue: 'Irish Film Institute (IFI)',
+                    // --- FIX: Use the canonical venue name here ---
+                    venue: IFI_CANONICAL_VENUE, 
                     category: 'film',
                     scraper_source: SCRAPER_NAME,
                     external_url: external_url,
-                    image_url: null, // Placeholder
-                    description: null // Placeholder
+                    image_url: null, 
+                    description: null 
                 });
             });
         }
@@ -143,23 +149,22 @@ async function scrapeIFI() {
 
     console.log(`\n🍿 Querying TMDB for ${titlesToEnrich.size} unique titles...`);
     
-    // STEP 2: ENRICH WITH TMDB
+    // STEP 2: ENRICH WITH TMDB (No change)
     const enrichmentMap = {};
     for (const title of titlesToEnrich) {
         const tmdbData = await fetchTMDBData(title);
         if (tmdbData) {
             enrichmentMap[title] = tmdbData;
         }
-        // Small delay to be polite to TMDB API
         await new Promise(r => setTimeout(r, 100)); 
     }
     
-    // STEP 3: MERGE DATA
+    // STEP 3: MERGE DATA (No change)
     const finalScreenings = screenings.map(s => {
         const extra = enrichmentMap[s.title];
         return {
             ...s,
-            image_url: extra?.image_url || s.image_url, // Prefer TMDB, fallback to null
+            image_url: extra?.image_url || s.image_url, 
             description: extra?.description || `Screening at IFI: ${s.title}`,
         };
     });
@@ -178,7 +183,8 @@ async function scrapeIFI() {
             .from('public_events')
             .select('id')
             .eq('title', event.title)
-            .eq('venue', event.venue)
+            // --- FIX: Ensure we use the canonical venue name in the duplicate check ---
+            .eq('venue', IFI_CANONICAL_VENUE) 
             .eq('start_date', event.start_date)
             .single();
 
