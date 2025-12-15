@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import UnifiedFeed from '../components/UnifiedFeed'; 
 import EntryForm from '../components/EntryForm'; 
-import TopNav from '../components/TopNav'; 
 import { Plus } from 'lucide-react'; 
 import { useNavigate } from 'react-router-dom';
 
@@ -32,7 +31,7 @@ function mapCategoryToKind(cat) {
     return c; 
 }
 
-export default function Dashboard({ session: propSession }) {
+export default function Dashboard({ session: propSession, logTrigger }) {
   const [session, setSession] = useState(propSession);
   const [profile, setProfile] = useState(null);
   
@@ -43,6 +42,11 @@ export default function Dashboard({ session: propSession }) {
 
   const [feedKey, setFeedKey] = useState(0); 
   const navigate = useNavigate();
+
+  // LISTEN FOR HEADER CLICK (From Layout)
+  useEffect(() => {
+    if (logTrigger > 0) handleOpenNew();
+  }, [logTrigger]);
 
   useEffect(() => {
     if (propSession?.user) {
@@ -128,13 +132,10 @@ export default function Dashboard({ session: propSession }) {
   };
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in relative">
+    <div className="animate-fade-in relative">
       
-      {/* 1. UNIFIED TOP NAV */}
-      <TopNav onLogClick={handleOpenNew} session={session} />
-
-      {/* 2. WELCOME SECTION */}
-      <div className="max-w-3xl mx-auto pt-8 pb-6 px-4">
+      {/* 1. WELCOME SECTION */}
+      <div className="pt-8 pb-6 px-4">
          <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
             Welcome back, {profile?.username || 'there'}.
          </h1>
@@ -144,8 +145,8 @@ export default function Dashboard({ session: propSession }) {
          <div className="h-px bg-gray-100 w-full mt-8 mb-8"></div>
       </div>
 
-      {/* 3. FEED */}
-      <div className="max-w-3xl mx-auto px-4 pb-20">
+      {/* 2. FEED */}
+      <div className="px-4">
          <UnifiedFeed 
             key={feedKey} 
             session={session} 
@@ -154,7 +155,7 @@ export default function Dashboard({ session: propSession }) {
          /> 
       </div>
 
-      {/* 4. MODAL (Bottom Sheet on Mobile) */}
+      {/* 3. MODAL */}
       {showEntryForm && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="w-full h-[85vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl relative">

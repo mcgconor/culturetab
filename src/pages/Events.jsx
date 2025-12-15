@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import UniversalCard from '../components/UniversalCard';
 import EntryForm from '../components/EntryForm';
-import TopNav from '../components/TopNav'; 
 import Filters from '../components/Filters';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +32,7 @@ function mapCategoryToKind(cat) {
     return c; 
 }
 
-export default function Events({ session }) {
+export default function Events({ session, logTrigger }) {
   const [allEvents, setAllEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +53,11 @@ export default function Events({ session }) {
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // LISTEN FOR HEADER CLICK
+  useEffect(() => {
+    if (logTrigger > 0) setShowEntryForm(true);
+  }, [logTrigger]);
 
   useEffect(() => {
     if (!allEvents.length) return;
@@ -123,12 +127,9 @@ export default function Events({ session }) {
   };
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in relative">
+    <div className="animate-fade-in relative">
       
-      {/* 1. TOP NAV */}
-      <TopNav onLogClick={() => setShowEntryForm(true)} session={session} />
-
-      <div className="max-w-3xl mx-auto pt-8 px-4">
+      <div className="pt-8 px-4">
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
           Upcoming Events
         </h1>
@@ -136,14 +137,13 @@ export default function Events({ session }) {
           See what's happening around Dublin.
         </p>
         
-        {/* 2. STICKY FILTERS */}
+        {/* STICKY FILTERS */}
         <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-xl py-2 -mx-4 px-4 border-b border-gray-50 mb-6 transition-all">
             <Filters filters={filters} setFilters={setFilters} showRating={false} />
         </div>
       </div>
 
-      {/* 3. FEED */}
-      <div className="max-w-3xl mx-auto px-4 pb-20">
+      <div className="px-4">
         {loading ? (
             <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>)}</div>
         ) : filteredEvents.length === 0 ? (
@@ -157,7 +157,7 @@ export default function Events({ session }) {
         )}
       </div>
 
-      {/* 4. BOTTOM SHEET MODAL */}
+      {/* MODAL */}
       {showEntryForm && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div className="w-full h-[85vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl relative">

@@ -39,7 +39,6 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
   const rawDate = item.start_date || item.event_date || item.created_at;
   const dateObj = rawDate ? new Date(rawDate) : null;
   
-  // Date Strings
   const dateStr = dateObj && !isNaN(dateObj) 
     ? dateObj.toLocaleDateString('en-IE', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
     : 'TBA';
@@ -71,24 +70,19 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
       }
   }
 
-  // --- HANDLER: Internal Navigation ---
   const handleCardClick = () => {
       navigate(type === 'entry' ? `/entry/${id}` : `/event/${id}`);
   };
 
-  // --- RENDER ---
   return (
     <div 
       onClick={handleCardClick}
-      // LAYOUT FIX: Changed 'flex' to 'flex flex-col sm:flex-row'
       className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex flex-col sm:flex-row gap-4 sm:gap-5"
     >
       
-      {/* 1. LEFT: VISUAL (Image OR Date Block) */}
-      {/* LAYOUT FIX: Changed width/height to be full-width banner on mobile (w-full h-40), fixed size on desktop (sm:w-24 sm:h-32) */}
+      {/* 1. VISUAL */}
       <div className="flex-shrink-0 w-full h-40 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
         {item.image_url ? (
-           // IF IMAGE EXISTS: Show it
            <img 
              src={item.image_url} 
              alt={title} 
@@ -96,7 +90,6 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
              onError={(e) => {e.target.style.display='none';}} 
            />
         ) : (
-           // NO IMAGE: Show Date Block
            <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
              <span className="text-xs font-bold text-red-600 uppercase tracking-wider">{month}</span>
              <span className="text-3xl font-black text-gray-900 leading-none my-1">{day}</span>
@@ -105,20 +98,14 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
         )}
       </div>
 
-      {/* 2. MIDDLE: CONTENT & ACTIONS */}
+      {/* 2. CONTENT */}
       <div className="flex-grow flex flex-col justify-between py-0.5 min-w-0 relative">
         
-        {/* TOP CONTENT BLOCK */}
         <div> 
-          
-          {/* TITLE */}
           <h3 className="font-black text-lg text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors mb-1 pr-24">
               {title}
           </h3>
 
-          {/* ABSOLUTE METADATA (Top Right) */}
-          {/* Note: On mobile stack, this might overlap title if title is long. 
-              Ideally, for stacked layout, we might want this relative, but keeping absolute as requested. */}
           <div className="absolute top-0 right-0 flex items-center gap-2"> 
                 {type === 'entry' && rating > 0 && (
                   <div className="flex items-center bg-yellow-50 text-yellow-700 px-1.5 py-1 rounded-md border border-yellow-100">
@@ -131,7 +118,6 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                 </span>
           </div>
 
-          {/* SUBTITLE */}
           <div className="mb-2">
              {subtitleLabel && (
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
@@ -146,22 +132,19 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
              </div>
           </div>
           
-          {/* DATE ROW */}
           <div className="text-xs font-bold text-gray-500">
              {type === 'public' && <span>{dateStr} at {timeStr}</span>}
           </div>
         </div>
         
-        {/* 3. BOTTOM ROW: ACTIONS + DATE FOOTER */}
+        {/* 3. BOTTOM ROW */}
         <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center gap-3">
           
-          {/* LEFT: DYNAMIC DATE LABEL */}
           <div className="text-[10px] font-bold text-gray-400">
             {type === 'entry' && <span>{getDateLabel(category)} {dateStr}</span>}
           </div>
 
-          {/* RIGHT: BUTTONS */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 items-center">
             {type === 'entry' ? (
                 <>
                 <button 
@@ -179,21 +162,32 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                 </>
             ) : (
                 <>
-                {/* PUBLIC: READ MORE */}
+                {/* READ MORE: FONT SIZE FIXED */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
-                  className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-colors"
+                  className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-blue-600 transition-colors"
                 >
                   <span>Read more</span>
                   <span className="text-base leading-none mb-0.5">→</span>
                 </button>
 
-                {/* PUBLIC: LOG THIS */}
+                {/* LOG THIS: RESPONSIVE BUTTON */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
-                    className="flex items-center gap-1 bg-black text-white text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-transform active:scale-95 shadow-sm ml-2"
+                    className="
+                        flex items-center justify-center 
+                        bg-black text-white 
+                        hover:bg-gray-800 transition-transform active:scale-95 shadow-sm 
+                        ml-2
+                        
+                        /* MOBILE: Circle Button */
+                        w-8 h-8 rounded-full 
+                        sm:w-auto sm:h-auto sm:rounded-full sm:px-3 sm:py-1.5
+                    "
                 >
-                    <Plus className="w-3 h-3" /> Log This
+                    <Plus className="w-4 h-4 sm:w-3 sm:h-3" /> 
+                    {/* Desktop Text */}
+                    <span className="hidden sm:inline ml-1 text-[10px] sm:text-xs font-bold">Log This</span>
                 </button>
                 </>
             )}
