@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import UniversalCard from '../components/UniversalCard';
 import EntryForm from '../components/EntryForm';
-import Filters from '../components/Filters'; // IMPORT REPURPOSED FILE
-import { ArrowLeft, Plus } from 'lucide-react';
+import TopNav from '../components/TopNav'; 
+import Filters from '../components/Filters';
+import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function History({ session: propSession }) {
@@ -35,36 +36,25 @@ export default function History({ session: propSession }) {
     }
   }, [propSession]);
 
-  // FILTER LOGIC
   useEffect(() => {
     if (!allEntries.length) return;
-
     let result = allEntries;
 
-    // 1. Search (Title or Creator)
     if (filters.search) {
         const q = filters.search.toLowerCase();
         result = result.filter(e => e.title.toLowerCase().includes(q) || e.creator?.toLowerCase().includes(q));
     }
-
-    // 2. Category
     if (filters.kind !== 'all') {
         result = result.filter(e => e.kind === filters.kind);
     }
-
-    // 3. Date
     if (filters.date) {
         result = result.filter(e => e.event_date === filters.date);
     }
-
-    // 4. Rating
     if (filters.rating !== 'all') {
         const minRating = Number(filters.rating);
         result = result.filter(e => e.rating >= minRating);
     }
-
     setFilteredEntries(result);
-
   }, [filters, allEntries]);
 
   const fetchHistory = async (userId) => {
@@ -79,11 +69,8 @@ export default function History({ session: propSession }) {
         if (error) throw error;
         setAllEntries(data || []);
         setFilteredEntries(data || []);
-    } catch (err) {
-        console.error(err);
-    } finally {
-        setLoading(false);
-    }
+    } catch (err) { console.error(err); } 
+    finally { setLoading(false); }
   };
 
   const handleUpdateEntry = async (id, formData) => {
@@ -117,31 +104,32 @@ export default function History({ session: propSession }) {
 
   return (
     <div className="min-h-screen bg-white animate-fade-in relative">
-      <div className="max-w-3xl mx-auto pt-10 pb-6 px-4">
-        <button onClick={() => navigate('/')} className="group flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-black mb-6 transition-colors">
-          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
-        </button>
-        <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">Your History</h1>
-        <p className="text-lg text-gray-500 max-w-xl leading-relaxed">A collection of everything you've watched, read, and attended.</p>
-        <div className="h-px bg-gray-100 w-full mt-10 mb-8"></div>
+      
+      {/* 1. TOP NAV */}
+      <TopNav onLogClick={() => setShowEntryForm(true)} session={propSession} />
 
-        {/* REPURPOSED FILTER COMPONENT - WITH RATINGS ENABLED */}
-        <Filters 
-            filters={filters} 
-            setFilters={setFilters} 
-            showRating={true} 
-        />
+      <div className="max-w-3xl mx-auto pt-8 px-4">
+        <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
+            Your History
+        </h1>
+        <p className="text-lg text-gray-500 max-w-xl leading-relaxed mb-6">
+            A collection of everything you've watched, read, and attended.
+        </p>
+
+        {/* 2. STICKY FILTERS */}
+        <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-xl py-2 -mx-4 px-4 border-b border-gray-50 mb-6 transition-all">
+            <Filters filters={filters} setFilters={setFilters} showRating={true} />
+        </div>
       </div>
 
+      {/* 3. FEED */}
       <div className="max-w-3xl mx-auto px-4 pb-20">
         {loading ? (
             <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>)}</div>
         ) : filteredEntries.length === 0 ? (
             <div className="text-center py-20 bg-gray-50 rounded-2xl border border-gray-100">
                 <p className="text-gray-500 font-medium">No results match your filters.</p>
-                <button onClick={() => setFilters({search: '', kind: 'all', date: '', rating: 'all'})} className="mt-4 text-black font-bold underline text-sm">
-                    Clear Filters
-                </button>
+                <button onClick={() => setFilters({search: '', kind: 'all', date: '', rating: 'all'})} className="mt-4 text-black font-bold underline text-sm">Clear Filters</button>
             </div>
         ) : (
             <div className="space-y-4">
@@ -158,10 +146,13 @@ export default function History({ session: propSession }) {
         )}
       </div>
 
+      {/* 4. BOTTOM SHEET MODAL */}
       {showEntryForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
-                <button onClick={() => setShowEntryForm(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"><Plus className="w-5 h-5 transform rotate-45 text-gray-500" /></button>
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full h-[85vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl relative">
+                <button onClick={() => setShowEntryForm(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10">
+                    <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
+                </button>
                 <EntryForm entryToEdit={entryToEdit} onUpdateEntry={handleUpdateEntry} onCancel={() => setShowEntryForm(false)} onAddEntry={() => {}} />
             </div>
         </div>

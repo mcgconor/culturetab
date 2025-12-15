@@ -2,38 +2,25 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import UnifiedFeed from '../components/UnifiedFeed'; 
 import EntryForm from '../components/EntryForm'; 
+import TopNav from '../components/TopNav'; 
 import { Plus } from 'lucide-react'; 
 import { useNavigate } from 'react-router-dom';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
-// FIX: Removed 'dateString' param. We now search by TITLE ONLY.
+// HELPER: Fetch Director
 async function fetchDirector(title) {
     if (!TMDB_API_KEY || !title) return '';
-
     try {
-        // 1. Search by Title (No year restriction)
-        const searchRes = await fetch(
-            `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`
-        );
+        const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
         const searchData = await searchRes.json();
-        const movie = searchData.results?.[0]; // Best match
-
+        const movie = searchData.results?.[0];
         if (!movie) return '';
-
-        // 2. Fetch Credits
-        const creditsRes = await fetch(
-            `https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`
-        );
+        const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const creditsData = await creditsRes.json();
-        
-        // 3. Find Director
         const director = creditsData.crew?.find(person => person.job === 'Director');
         return director ? director.name : '';
-    } catch (e) {
-        console.error("Director fetch failed:", e);
-        return ''; 
-    }
+    } catch (e) { return ''; }
 }
 
 function mapCategoryToKind(cat) {
@@ -49,6 +36,7 @@ export default function Dashboard({ session: propSession }) {
   const [session, setSession] = useState(propSession);
   const [profile, setProfile] = useState(null);
   
+  // MODAL STATES
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState(null); 
   const [preFillData, setPreFillData] = useState(null); 
@@ -67,7 +55,9 @@ export default function Dashboard({ session: propSession }) {
   }, [propSession]);
 
   useEffect(() => {
-    if (session?.user) getProfile(session.user.id);
+    if (session?.user) {
+        getProfile(session.user.id);
+    }
   }, [session]);
 
   const getProfile = async (userId) => {
@@ -85,7 +75,6 @@ export default function Dashboard({ session: propSession }) {
     const kind = mapCategoryToKind(item.category);
     let directorName = '';
 
-    // Only fetch director if it's a movie
     if (kind === 'film' || kind === 'movie') {
         directorName = await fetchDirector(item.title);
     }
@@ -95,7 +84,7 @@ export default function Dashboard({ session: propSession }) {
         kind: kind,
         event_date: item.start_date ? item.start_date.split('T')[0] : '',
         image_url: item.image_url,
-        creator: directorName // Will be the director name or empty string
+        creator: directorName
     });
     setEntryToEdit(null);
     setShowEntryForm(true);
@@ -140,37 +129,53 @@ export default function Dashboard({ session: propSession }) {
 
   return (
     <div className="min-h-screen bg-white animate-fade-in relative">
-      <div className="max-w-3xl mx-auto pt-10 pb-6 px-4">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-                <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">
-                    Welcome back, {profile?.username || 'there'}.
-                </h1>
-                <p className="text-lg text-gray-500 max-w-xl leading-relaxed">
-                    Ready to log your latest culture fix? Track your books, films, and art here.
-                </p>
-            </div>
-            <button onClick={handleOpenNew} className="bg-black text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-gray-800 transition-transform active:scale-95 shadow-md flex items-center gap-2 whitespace-nowrap">
-                <Plus className="w-4 h-4" /> Log New Entry
-            </button>
-        </div>
-        <div className="h-px bg-gray-100 w-full mt-10 mb-8"></div>
+      
+      {/* 1. UNIFIED TOP NAV */}
+      <TopNav onLogClick={handleOpenNew} session={session} />
+
+      {/* 2. WELCOME SECTION */}
+      <div className="max-w-3xl mx-auto pt-8 pb-6 px-4">
+         <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
+            Welcome back, {profile?.username || 'there'}.
+         </h1>
+         <p className="text-lg text-gray-500 max-w-xl leading-relaxed">
+            Ready to log your latest culture fix?
+         </p>
+         <div className="h-px bg-gray-100 w-full mt-8 mb-8"></div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4">
-         <UnifiedFeed key={feedKey} session={session} onEdit={handleEditTrigger} onLogPublic={handleLogPublicEvent} /> 
+      {/* 3. FEED */}
+      <div className="max-w-3xl mx-auto px-4 pb-20">
+         <UnifiedFeed 
+            key={feedKey} 
+            session={session} 
+            onEdit={handleEditTrigger} 
+            onLogPublic={handleLogPublicEvent} 
+         /> 
       </div>
 
+      {/* 4. MODAL (Bottom Sheet on Mobile) */}
       {showEntryForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
-                <button onClick={closeModal} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full h-[85vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl relative">
+                <button 
+                  onClick={closeModal}
+                  className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"
+                >
                   <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
                 </button>
-                <EntryForm entryToEdit={entryToEdit} initialData={preFillData} onAddEntry={handleAddEntry} onUpdateEntry={handleUpdateEntry} onCancel={closeModal} />
+
+                <EntryForm 
+                    entryToEdit={entryToEdit} 
+                    initialData={preFillData}
+                    onAddEntry={handleAddEntry}
+                    onUpdateEntry={handleUpdateEntry}
+                    onCancel={closeModal}
+                />
             </div>
         </div>
       )}
+
     </div>
   );
 }
