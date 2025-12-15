@@ -1,214 +1,186 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ExternalLink } from 'lucide-react'; 
+import EntryForm from '../components/EntryForm'; 
+import { Plus, MapPin, Calendar, ExternalLink, Loader2 } from 'lucide-react'; 
 
-export default function PublicEventDetail() {
+const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+
+function getHighResImageUrl(url) {
+  if (!url) return null;
+  if (url.includes('tmdb.org')) return url.replace(/\/w\d+\//, '/original/'); 
+  if (url.includes('books.google.com')) return url.replace('&zoom=1', '&zoom=3'); 
+  return url;
+}
+
+function getSourceName(event) {
+    if (!event) return '';
+    if (event.scraper_source && event.scraper_source.includes('IFI')) return 'Irish Film Institute';
+    if (event.external_url) {
+        try {
+            const hostname = new URL(event.external_url).hostname;
+            const cleanHost = hostname.replace('www.', '').replace('m.', '');
+            if (cleanHost.includes('ticketmaster')) return 'Ticketmaster';
+            if (cleanHost.includes('ifi.ie')) return 'Irish Film Institute';
+            return cleanHost;
+        } catch (error) { }
+    }
+    if (event.source === 'ticketmaster') return 'Ticketmaster';
+    return event.source || 'External Source';
+}
+
+function mapCategoryToKind(cat) {
+    if (!cat) return 'book'; 
+    const c = cat.toLowerCase();
+    if (c === 'music' || c === 'gig') return 'concert';
+    if (c === 'art' || c === 'museum') return 'exhibition';
+    if (c === 'play' || c === 'drama') return 'theatre';
+    return c; 
+}
+
+// FIX: Removed Year Logic
+async function fetchDirector(title) {
+    if (!TMDB_API_KEY || !title) return '';
+    try {
+        // Search strictly by title
+        const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
+        const searchData = await searchRes.json();
+        const movie = searchData.results?.[0];
+        
+        if (!movie) return '';
+
+        const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
+        const creditsData = await creditsRes.json();
+        const director = creditsData.crew?.find(person => person.job === 'Director');
+        return director ? director.name : '';
+    } catch (e) { return ''; }
+}
+
+export default function PublicEventDetail({ session }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEntryForm, setShowEntryForm] = useState(false);
+  const [preFillData, setPreFillData] = useState(null);
+  const [isPreparingLog, setIsPreparingLog] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
-      // Fetch the specific event by ID
-      const { data, error } = await supabase
-        .from('public_events')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching event:", error);
-      } else if (data) {
-        setEvent(data);
-      }
+      const { data, error } = await supabase.from('public_events').select('*').eq('id', id).single();
+      if (error) console.error(error);
+      else setEvent(data);
       setLoading(false);
     };
-
-    if (id) fetchEvent();
+    if(id) fetchEvent();
   }, [id]);
 
-  if (loading) return <div className="p-12 text-center text-gray-400">Loading details...</div>;
-  
-  if (!event) return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Event Not Found</h2>
-      <button onClick={() => navigate('/events')} className="text-blue-600 font-bold hover:underline">
-        Back to Calendar
-      </button>
-    </div>
-  );
+  const handleLogClick = async () => {
+    setIsPreparingLog(true);
+    const kind = mapCategoryToKind(event.category);
+    let directorName = '';
 
-  // Date Formatting
-  let dateStr = "Date TBA";
-  let timeStr = "Time TBA";
-  let dayNum = "?";
-  let monthStr = "";
-  
-  if (event.start_date) {
-    const dateObj = new Date(event.start_date);
-    if (!isNaN(dateObj)) {
-      dateStr = dateObj.toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-      timeStr = dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' });
-      dayNum = dateObj.getDate();
-      monthStr = dateObj.toLocaleString('default', { month: 'short' });
+    if (kind === 'film' || kind === 'movie') {
+        directorName = await fetchDirector(event.title);
     }
-  }
 
-  // --- HELPER: DOMAIN MAPPING (Clean & Pretty) ---
-  const getDomainDisplayName = (url) => {
+    setPreFillData({
+        title: event.title,
+        kind: kind,
+        event_date: event.start_date ? event.start_date.split('T')[0] : '',
+        image_url: event.image_url,
+        creator: directorName
+    });
+
+    setIsPreparingLog(false);
+    setShowEntryForm(true);
+  };
+
+  const handleAddEntry = async (formData) => {
     try {
-      let hostname = new URL(url).hostname;
-      
-      // 1. Strip 'www.'
-      hostname = hostname.replace(/^www\./, '');
-
-      // 2. "Nice Name" Mapping for major venues
-      const domainMap = {
-        'nch.ie': 'National Concert Hall',
-        'eventbrite.ie': 'Eventbrite',
-        'eventbrite.com': 'Eventbrite',
-        'tickets.ie': 'Tickets.ie',
-        'bordgaisenergytheatre.ie': 'Bord Gáis Energy Theatre',
-        '3arena.ie': '3Arena',
-        'olympia.ie': '3Olympia Theatre',
-        'whelanslive.com': "Whelan's",
-        'vicarstreet.ie': 'Vicar Street',
-        'sugarclubtickets.ie': 'The Sugar Club'
-      };
-
-      if (domainMap[hostname]) return domainMap[hostname];
-
-      // 3. Subdomain Stripping Logic (The "RIAM" Fix)
-      // If we have 3+ parts (e.g. tickets.riam.ie), try to grab just the root domain.
-      const parts = hostname.split('.');
-      if (parts.length > 2) {
-          // This is a safe heuristic for .ie and .com domains
-          // e.g. "tickets.riam.ie" -> "riam.ie"
-          return parts.slice(-2).join('.');
-      }
-
-      return hostname;
-    } catch (e) {
-      return 'External Site';
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession) return alert('Please sign in');
+        const { id, ...cleanData } = formData;
+        const { error } = await supabase.from('entries').insert([{ ...cleanData, user_id: currentSession.user.id }]);
+        if (error) throw error;
+        setShowEntryForm(false);
+        navigate('/history'); 
+    } catch (error) {
+        alert(`Supabase Error: ${error.message}`);
     }
   };
 
-  // --- HELPER: SOURCE LABEL LOGIC ---
-  const getSourceLabel = (source, url) => {
-    if (!source) return 'External Source';
-    const s = source.toLowerCase();
-    
-    // 1. Reliable/Direct Sources
-    if (s.includes('ticketmaster')) return 'Ticketmaster';
-    if (s.includes('ifi')) return 'Irish Film Institute';
-    
-    // 2. Journal of Music (Deep Dive)
-    // If it's a Journal event, we prefer to show the DESTINATION domain, not "The Journal"
-    if (s.includes('journal')) {
-        if (url && !url.includes('journalofmusic.com')) {
-            return getDomainDisplayName(url);
-        }
-        return 'The Journal of Music';
-    }
-    
-    return source; // Fallback
-  };
+  if (loading) return <div className="p-12 text-center text-gray-400">Loading...</div>;
+  if (!event) return <div className="p-12 text-center">Event not found</div>;
+
+  const highResImage = getHighResImageUrl(event.image_url);
+  const eventDate = new Date(event.start_date);
+  const ticketLink = event.external_url;
+  const sourceLabel = getSourceName(event);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 animate-fade-in">
-      
-      {/* NAV */}
-      <div className="max-w-4xl mx-auto mb-6">
-        <button 
-          onClick={() => navigate('/events')} 
-          className="text-sm font-bold text-gray-400 hover:text-black transition-colors flex items-center gap-2"
-        >
-          ← Back to Calendar
+    <div className="min-h-screen bg-gray-50 py-12 px-4 animate-fade-in relative">
+      <div className="max-w-3xl mx-auto mb-6 flex justify-between items-center">
+        <button onClick={() => navigate(-1)} className="text-sm font-bold text-gray-400 hover:text-black">← Back</button>
+        <button onClick={handleLogClick} disabled={isPreparingLog} className="bg-black text-white font-bold text-xs px-4 py-2 rounded-lg hover:bg-gray-800 transition-transform active:scale-95 shadow-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait">
+            {isPreparingLog ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching info...</> : <><Plus className="w-3 h-3" /> Log This</>}
         </button>
       </div>
 
-      <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        
-        <div className="flex flex-col md:flex-row">
-          
-          {/* IMAGE SECTION */}
-          <div className="md:w-2/5 h-64 md:h-auto bg-gray-100 relative">
-            {event.image_url ? (
-              <img 
-                src={event.image_url} 
-                alt={event.title} 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={(e) => { e.target.style.display = 'none'; }} // Hide if broken
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-300 font-bold text-2xl uppercase">
-                {event.category || 'Event'}
-              </div>
-            )}
-          </div>
-
-          {/* CONTENT SECTION */}
-          <div className="md:w-3/5 p-6 md:p-8 flex flex-col justify-between">
-            <div>
-              {/* Category Pill */}
-              <span className="inline-block px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-4">
-                {event.category || 'Event'}
-              </span>
-
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-tight mb-2">
-                {event.title}
-              </h1>
-              
-              <div className="text-lg font-bold text-gray-500 mb-6 flex items-center gap-2">
-                📍 {event.venue}
-              </div>
-
-              {/* Date Box */}
-              <div className="flex items-center gap-4 py-4 border-y border-gray-100 mb-6">
-                <div className="text-center px-2">
-                   <div className="text-xs font-bold text-red-600 uppercase">{monthStr}</div>
-                   <div className="text-2xl font-black text-gray-900 leading-none">{dayNum}</div>
-                </div>
-                <div className="h-8 w-px bg-gray-100"></div>
-                <div>
-                   <div className="text-sm font-bold text-gray-900">{dateStr}</div>
-                   <div className="text-xs text-gray-500">{timeStr !== '00:00' ? `Doors: ${timeStr}` : 'Time TBA'}</div>
-                </div>
-              </div>
-
-              {/* Description */}
-              {event.description && (
-                <div className="prose prose-sm prose-gray max-w-none text-gray-600 mb-8 leading-relaxed whitespace-pre-wrap">
-                  {event.description}
-                </div>
-              )}
+      <article className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {highResImage && (
+            <div className="w-full bg-gray-100 relative overflow-hidden flex justify-center items-center py-8 px-4">
+               <div className="absolute inset-0 opacity-30 blur-2xl scale-110" style={{ backgroundImage: `url(${highResImage})`, backgroundPosition: 'center', backgroundSize: 'cover' }} />
+               <img src={highResImage} alt={event.title} className="relative z-10 max-h-[500px] w-auto max-w-full shadow-lg rounded-lg" />
             </div>
+        )}
 
-            {/* ACTION BUTTON */}
-            {event.external_url && (
-              <div className="mt-4 pt-6 border-t border-gray-50">
-                <a 
-                  href={event.external_url} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="w-full bg-black text-white h-14 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 transform active:scale-[0.98]"
-                >
-                  <span>More Information</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-                
-                {/* Clean Source Label */}
-                <p className="text-center text-[10px] text-gray-400 font-medium uppercase tracking-wider mt-3">
-                  Sourced from {getSourceLabel(event.scraper_source || event.source, event.external_url)}
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="p-8 md:p-12">
+             <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
+                <span className="inline-block px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                  {event.category || 'Event'}
+                </span>
+             </div>
+
+             <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 leading-tight">{event.title}</h1>
+             
+             <div className="flex items-center gap-2 text-xl text-gray-500 font-bold mb-8">
+                <MapPin className="w-5 h-5 text-gray-400" />
+                {event.venue || 'Dublin City'}
+             </div>
+             
+             <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-10 pb-10 border-b border-gray-100">
+               <Calendar className="w-4 h-4" />
+               <span>Happening on {eventDate.toLocaleDateString('en-IE')} at {eventDate.toLocaleTimeString('en-IE', {hour: '2-digit', minute:'2-digit'})}</span>
+             </div>
+
+             {event.description && (
+                <div className="mb-10">
+                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">About this Event</h3>
+                    <div className="prose prose-lg prose-gray max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">{event.description}</div>
+                </div>
+             )}
+
+             {ticketLink && (
+                <div className="pt-8 border-t border-gray-100">
+                    <a href={ticketLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-black text-white font-bold px-8 py-4 rounded-xl hover:bg-gray-800 transition-transform active:scale-95 shadow-md">
+                        <span>More information</span>
+                        <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <p className="mt-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sourced by {sourceLabel}</p>
+                </div>
+             )}
         </div>
-      </div>
+      </article>
+
+      {showEntryForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
+                <button onClick={() => setShowEntryForm(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"><Plus className="w-5 h-5 transform rotate-45 text-gray-500" /></button>
+                <EntryForm initialData={preFillData} onAddEntry={handleAddEntry} onCancel={() => setShowEntryForm(false)} />
+            </div>
+        </div>
+      )}
     </div>
   );
 }

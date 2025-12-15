@@ -3,10 +3,10 @@ import StarRatingInput from './StarRatingInput';
 import MovieSearch from './MovieSearch'; 
 import BookSearch from './BookSearch'; 
 
-export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCancel }) {
+export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, initialData, onCancel }) {
   const [formData, setFormData] = useState({
     title: '',
-    kind: 'book', // Default
+    kind: 'book', 
     rating: 0,
     creator: '',
     reflection: '',
@@ -14,16 +14,23 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     image_url: '' 
   });
   
-  // Controls whether we show the API search or the standard text input
   const [manualEntryMode, setManualEntryMode] = useState(false);
 
-  // If editing, load data and defaulting to manual mode
   useEffect(() => {
     if (entryToEdit) {
       setFormData(entryToEdit);
       setManualEntryMode(true); 
+    } 
+    else if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        ...initialData,
+        id: undefined, 
+        event_date: initialData.event_date || new Date().toISOString().split('T')[0]
+      }));
+      setManualEntryMode(true); 
     }
-  }, [entryToEdit]);
+  }, [entryToEdit, initialData]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -32,7 +39,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     } else {
       onAddEntry(formData);
     }
-    // Reset defaults
     setFormData({
       title: '', kind: 'book', rating: 5, creator: '', reflection: '',
       event_date: new Date().toISOString().split('T')[0], image_url: ''
@@ -48,7 +54,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     setFormData({ ...formData, rating: newRating });
   };
   
-  // Called when API search is successful
   const handleAutoSelect = (selection) => {
     setFormData(prev => ({
       ...prev,
@@ -59,17 +64,15 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
     }));
   };
 
-  // Called when user clicks "(X) Title Not Found"
   const handleManualBypass = (currentTitle) => {
-    setFormData(prev => ({
-        ...prev,
-        title: currentTitle // Save what they typed
-    }));
-    setManualEntryMode(true); // Switch to dumb input
+    setFormData(prev => ({ ...prev, title: currentTitle }));
+    setManualEntryMode(true); 
   };
 
-  // When category changes, reset to search mode
   const handleCategoryChange = (newKind) => {
+    // PREVENT CHANGE if we pre-filled data (initialData exists)
+    if (initialData) return; 
+
     setFormData({ ...formData, kind: newKind, title: '', creator: '', image_url: '' });
     setManualEntryMode(false);
   };
@@ -95,7 +98,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
   const inputClass = "w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:bg-white focus:border-black focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-gray-400 appearance-none";
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-8 animate-fade-in-down">
+    <div className="p-6 sm:p-8">
       
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-black text-gray-900 tracking-tight">
@@ -111,16 +114,22 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           <div className="grid grid-cols-5 gap-2">
             {categories.map((cat) => {
               const isActive = formData.kind === cat.id;
+              // If initialData is present, disable non-active buttons
+              const isDisabled = initialData && !isActive; 
+              
               return (
                 <button
                   key={cat.id}
                   type="button"
+                  disabled={isDisabled}
                   onClick={() => handleCategoryChange(cat.id)}
                   className={`
                     h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 border
                     ${isActive 
                       ? 'bg-black text-white border-black shadow-md transform scale-[1.02]' 
-                      : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100 hover:text-gray-600'
+                      : isDisabled
+                        ? 'bg-gray-50 text-gray-300 border-transparent cursor-not-allowed opacity-50'
+                        : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100 hover:text-gray-600'
                     }
                   `}
                 >
@@ -132,10 +141,9 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
           </div>
         </div>
 
-        {/* ROW 2: TITLE (Logic Switcher) */}
+        {/* ROW 2: TITLE */}
         <div>
           <label className={labelClass}>Title</label>
-          
           {!manualEntryMode && formData.kind === 'film' ? (
             <MovieSearch 
               initialTitle={formData.title} 
@@ -149,7 +157,6 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               onManualBypass={handleManualBypass}
             />
           ) : (
-            // STANDARD TEXT INPUT (Fallback or Manual Mode)
             <input
               name="title"
               type="text"
@@ -158,8 +165,7 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, onCa
               onChange={handleChange}
               className={inputClass}
               required
-              autoFocus={manualEntryMode} // Focus here if we just switched to it
-              // REMOVED onBlur HERE - It was causing the bug!
+              autoFocus={manualEntryMode} 
             />
           )}
         </div>

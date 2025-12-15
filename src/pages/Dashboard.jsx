@@ -1,166 +1,176 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { useLocation } from 'react-router-dom'; 
-import EntryForm from '../components/EntryForm';
-import EntryList from '../components/EntryList';
-import Stats from '../components/Stats';
-import DublinEvents from '../components/DublinEvents';
+import UnifiedFeed from '../components/UnifiedFeed'; 
+import EntryForm from '../components/EntryForm'; 
+import { Plus } from 'lucide-react'; 
+import { useNavigate } from 'react-router-dom';
 
-export default function Dashboard({ session }) {
-  const [entries, setEntries] = useState([]);
-  const [statsData, setStatsData] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [entryToEdit, setEntryToEdit] = useState(null);
-  
-  const location = useLocation(); 
-  const firstName = session?.user?.user_metadata?.full_name?.split(' ')[0] || 'there';
+const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
-  // HELPER: Start Editing
-  const startEdit = useCallback((entry) => {
-    setEntryToEdit(entry);
-    setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+// FIX: Removed 'dateString' param. We now search by TITLE ONLY.
+async function fetchDirector(title) {
+    if (!TMDB_API_KEY || !title) return '';
 
-  // 3. LISTEN FOR INCOMING EDIT REQUESTS (From History or Detail page)
-  useEffect(() => {
-    if (location.state?.editEntry) {
-      startEdit(location.state.editEntry);
-      // Optional: Clear state so it doesn't re-trigger on refresh
-      window.history.replaceState({}, document.title);
+    try {
+        // 1. Search by Title (No year restriction)
+        const searchRes = await fetch(
+            `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`
+        );
+        const searchData = await searchRes.json();
+        const movie = searchData.results?.[0]; // Best match
+
+        if (!movie) return '';
+
+        // 2. Fetch Credits
+        const creditsRes = await fetch(
+            `https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`
+        );
+        const creditsData = await creditsRes.json();
+        
+        // 3. Find Director
+        const director = creditsData.crew?.find(person => person.job === 'Director');
+        return director ? director.name : '';
+    } catch (e) {
+        console.error("Director fetch failed:", e);
+        return ''; 
     }
-  }, [location, startEdit]);
+}
 
-  // DATA FETCHING
-  const fetchRecent = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('entries')
-      .select('*')
-      .eq('user_id', session.user.id) // <--- CRITICAL FIX: Filter by User ID
-      .order('event_date', { ascending: false }) 
-      .limit(5);
+function mapCategoryToKind(cat) {
+    if (!cat) return 'book'; 
+    const c = cat.toLowerCase();
+    if (c === 'music' || c === 'gig') return 'concert';
+    if (c === 'art' || c === 'museum') return 'exhibition';
+    if (c === 'play' || c === 'drama') return 'theatre';
+    return c; 
+}
 
-    if (error) console.error('Error fetching recent:', error);
-    else setEntries(data);
-  }, [session.user.id]); // Added dependency
+export default function Dashboard({ session: propSession }) {
+  const [session, setSession] = useState(propSession);
+  const [profile, setProfile] = useState(null);
+  
+  const [showEntryForm, setShowEntryForm] = useState(false);
+  const [entryToEdit, setEntryToEdit] = useState(null); 
+  const [preFillData, setPreFillData] = useState(null); 
 
-  const fetchStats = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('entries')
-      .select('*')
-      .eq('user_id', session.user.id); // <--- CRITICAL FIX: Filter by User ID
-      
-    if (!error) setStatsData(data);
-  }, [session.user.id]); // Added dependency
+  const [feedKey, setFeedKey] = useState(0); 
+  const navigate = useNavigate();
 
-  // GHOST ENTRY LOGIC
   useEffect(() => {
-    const processPendingEntry = async () => {
-      const pendingStr = localStorage.getItem('pendingEntry');
-      if (pendingStr && session?.user) {
-        try {
-          const pendingData = JSON.parse(pendingStr);
-          const { error } = await supabase.from('entries').insert([{
-            user_id: session.user.id,
-            ...pendingData,
-            status: 'past'
-          }]);
-          if (!error) { fetchRecent(); fetchStats(); }
-        } catch (err) { console.error(err); } 
-        finally { localStorage.removeItem('pendingEntry'); }
-      }
-    };
-    processPendingEntry();
-  }, [session, fetchRecent, fetchStats]);
+    if (propSession?.user) {
+        setSession(propSession);
+    } else {
+        supabase.auth.getSession().then(({ data }) => {
+            if (data?.session) setSession(data.session);
+        });
+    }
+  }, [propSession]);
 
-  useEffect(() => { 
-    fetchRecent(); 
-    fetchStats(); 
-  }, [fetchRecent, fetchStats]);
+  useEffect(() => {
+    if (session?.user) getProfile(session.user.id);
+  }, [session]);
 
-  // HANDLERS
+  const getProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    setProfile(data);
+  };
+
+  const handleOpenNew = () => {
+    setEntryToEdit(null);
+    setPreFillData(null);
+    setShowEntryForm(true);
+  };
+
+  const handleLogPublicEvent = async (item) => {
+    const kind = mapCategoryToKind(item.category);
+    let directorName = '';
+
+    // Only fetch director if it's a movie
+    if (kind === 'film' || kind === 'movie') {
+        directorName = await fetchDirector(item.title);
+    }
+
+    setPreFillData({
+        title: item.title,
+        kind: kind,
+        event_date: item.start_date ? item.start_date.split('T')[0] : '',
+        image_url: item.image_url,
+        creator: directorName // Will be the director name or empty string
+    });
+    setEntryToEdit(null);
+    setShowEntryForm(true);
+  };
+
   const handleAddEntry = async (formData) => {
-    const { error } = await supabase.from('entries').insert([
-      { user_id: session.user.id, ...formData, status: 'past' }
-    ]);
-    if (error) alert(error.message);
-    else { setShowForm(false); fetchRecent(); fetchStats(); }
+    if (!session?.user) return; 
+    const { id, ...cleanData } = formData;
+    try {
+        const { error } = await supabase.from('entries').insert([{ ...cleanData, user_id: session.user.id }]);
+        if (error) throw error; 
+        closeModal();
+        setFeedKey(prev => prev + 1); 
+    } catch (error) {
+        alert(`Supabase Error: ${error.message}`);
+    }
   };
 
-  const handleDelete = async (id) => {
-    if(!window.confirm("Delete this entry?")) return;
-    const { error } = await supabase.from('entries').delete().eq('id', id);
-    if (!error) { fetchRecent(); fetchStats(); }
+  const handleUpdateEntry = async (id, formData) => {
+    try {
+        const { sortDate, type, ...cleanData } = formData;
+        const { error } = await supabase.from('entries').update(cleanData).eq('id', id);
+        if (error) throw error;
+        closeModal();
+        setFeedKey(prev => prev + 1); 
+    } catch (error) {
+        alert(`Update Error: ${error.message}`);
+    }
   };
 
-  const handleUpdate = async (id, formData) => {
-    const { error } = await supabase.from('entries').update(formData).eq('id', id);
-    if (!error) { setEntryToEdit(null); setShowForm(false); fetchRecent(); fetchStats(); }
+  const handleEditTrigger = (item) => {
+    setEntryToEdit(item); 
+    setPreFillData(null);
+    setShowEntryForm(true); 
+  };
+
+  const closeModal = () => {
+    setShowEntryForm(false);
+    setEntryToEdit(null);
+    setPreFillData(null);
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12 animate-fade-in">
-      
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 border-b border-gray-100 pb-8">
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 mb-2">
-            Welcome back, {firstName}.
-          </h1>
-          <p className="text-gray-500 text-lg max-w-md leading-relaxed">
-            Ready to log your latest culture fix? Track your books, films, and art here.
-          </p>
+    <div className="min-h-screen bg-white animate-fade-in relative">
+      <div className="max-w-3xl mx-auto pt-10 pb-6 px-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+                <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-2">
+                    Welcome back, {profile?.username || 'there'}.
+                </h1>
+                <p className="text-lg text-gray-500 max-w-xl leading-relaxed">
+                    Ready to log your latest culture fix? Track your books, films, and art here.
+                </p>
+            </div>
+            <button onClick={handleOpenNew} className="bg-black text-white font-bold text-sm px-6 py-3 rounded-xl hover:bg-gray-800 transition-transform active:scale-95 shadow-md flex items-center gap-2 whitespace-nowrap">
+                <Plus className="w-4 h-4" /> Log New Entry
+            </button>
         </div>
-
-        {!showForm && (
-          <button 
-            onClick={() => { setEntryToEdit(null); setShowForm(true); }}
-            className="flex-shrink-0 bg-black text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl transform active:scale-[0.98]"
-          >
-            + Log New Entry
-          </button>
-        )}
+        <div className="h-px bg-gray-100 w-full mt-10 mb-8"></div>
       </div>
 
-      {/* ENTRY FORM OVERLAY */}
-      {showForm && (
-        <div className="mb-12">
-          <EntryForm 
-            onAddEntry={handleAddEntry}
-            onUpdateEntry={handleUpdate}
-            entryToEdit={entryToEdit}
-            onCancel={() => { setShowForm(false); setEntryToEdit(null); }}
-          />
+      <div className="max-w-3xl mx-auto px-4">
+         <UnifiedFeed key={feedKey} session={session} onEdit={handleEditTrigger} onLogPublic={handleLogPublicEvent} /> 
+      </div>
+
+      {showEntryForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
+                <button onClick={closeModal} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10">
+                  <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
+                </button>
+                <EntryForm entryToEdit={entryToEdit} initialData={preFillData} onAddEntry={handleAddEntry} onUpdateEntry={handleUpdateEntry} onCancel={closeModal} />
+            </div>
         </div>
       )}
-
-      {/* STATS SECTION */}
-      <div className="mb-12">
-         <Stats entries={statsData} />
-      </div>
-
-      {/* DUBLIN EVENTS WIDGET */}
-      <DublinEvents />
-
-      {/* RECENT ACTIVITY */}
-      <div>
-        <div className="flex justify-between items-end mb-4 border-b border-gray-100 pb-2">
-          <h2 className="text-xl font-bold text-gray-900">Your Recent Activity</h2>
-          {entries.length > 0 && (
-             <a href="/history" className="text-sm font-bold text-gray-400 hover:text-black transition-colors">
-               View All →
-             </a>
-          )}
-        </div>
-
-        {entries.length === 0 && !showForm ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <p className="text-gray-400 font-medium">No entries yet. Start logging!</p>
-          </div>
-        ) : (
-          <EntryList entries={entries} onDelete={handleDelete} onEdit={startEdit} />
-        )}
-      </div>
     </div>
   );
 }

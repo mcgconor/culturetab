@@ -1,12 +1,34 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import EntryForm from '../components/EntryForm'; 
+import { Plus } from 'lucide-react'; 
+
+// --- HELPER: Upgrade Image Quality ---
+function getHighResImageUrl(url) {
+  if (!url) return null;
+  if (url.includes('tmdb.org')) return url.replace(/\/w\d+\//, '/original/'); 
+  if (url.includes('books.google.com')) return url.replace('&zoom=1', '&zoom=3'); 
+  return url;
+}
+
+// --- HELPER: Smart Date Label ---
+function getDateLabel(kind) {
+    if (!kind) return 'Logged on';
+    const cat = kind.toLowerCase();
+    if (cat === 'book') return 'Read on';
+    if (cat === 'film' || cat === 'movie') return 'Watched on';
+    if (cat === 'exhibition' || cat === 'museum' || cat === 'gallery') return 'Visited on';
+    if (cat === 'concert' || cat === 'theatre' || cat === 'gig') return 'Attended on';
+    return 'Logged on'; 
+}
 
 export default function EntryDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEntryForm, setShowEntryForm] = useState(false);
 
   useEffect(() => {
     const fetchEntry = async () => {
@@ -30,11 +52,29 @@ export default function EntryDetail() {
     }
   };
 
+  const handleUpdateEntry = async (entryId, formData) => {
+    try {
+        const { error } = await supabase
+            .from('entries')
+            .update(formData)
+            .eq('id', entryId);
+
+        if (error) throw error;
+        setEntry(prev => ({ ...prev, ...formData }));
+        setShowEntryForm(false);
+    } catch (error) {
+        console.error('Error updating entry:', error);
+        alert('Error updating entry.');
+    }
+  };
+
   if (loading) return <div className="p-12 text-center text-gray-400">Loading...</div>;
   if (!entry) return <div className="p-12 text-center">Entry not found</div>;
 
+  const highResImage = getHighResImageUrl(entry.image_url);
+
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 animate-fade-in">
+    <div className="min-h-screen bg-gray-50 py-12 px-4 animate-fade-in relative">
       
       {/* NAV */}
       <div className="max-w-3xl mx-auto mb-6 flex justify-between items-center">
@@ -42,7 +82,10 @@ export default function EntryDetail() {
           ← Back
         </button>
         <div className="flex gap-4">
-          <button onClick={() => navigate('/', { state: { editEntry: entry } })} className="text-xs font-bold text-gray-400 hover:text-black uppercase tracking-wider">
+          <button 
+            onClick={() => setShowEntryForm(true)} 
+            className="text-xs font-bold text-gray-400 hover:text-black uppercase tracking-wider"
+          >
             Edit
           </button>
           <button onClick={handleDelete} className="text-xs font-bold text-gray-400 hover:text-red-600 uppercase tracking-wider">
@@ -53,47 +96,90 @@ export default function EntryDetail() {
 
       <article className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         
-        {/* HEADER / COVER */}
-        <div className="flex flex-col md:flex-row">
-          {entry.image_url && (
-            <div className="md:w-1/3 h-64 md:h-auto relative bg-gray-100">
-               <img src={entry.image_url} alt={entry.title} className="w-full h-full object-cover" />
+        {/* 1. THE STAGE (Image Area) */}
+        {highResImage && (
+            <div className="w-full bg-gray-100 relative overflow-hidden flex justify-center items-center py-8 px-4">
+               
+               {/* OPTIONAL: Blurred Background for atmosphere */}
+               <div 
+                 className="absolute inset-0 opacity-30 blur-2xl scale-110"
+                 style={{ backgroundImage: `url(${highResImage})`, backgroundPosition: 'center', backgroundSize: 'cover' }}
+               />
+               
+               {/* MAIN IMAGE */}
+               {/* max-h-[60vh] ensures it doesn't become too tall on desktop */}
+               <img 
+                 src={highResImage} 
+                 alt={entry.title} 
+                 className="relative z-10 max-h-[500px] w-auto max-w-full shadow-lg rounded-lg" 
+               />
             </div>
-          )}
-          
-          <div className="p-8 flex-grow">
-             <div className="flex justify-between items-start mb-2">
-                <span className="inline-block px-2 py-1 bg-gray-100 rounded-md text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-4">
+        )}
+
+        {/* 2. CONTENT AREA (Full Width Below Image) */}
+        <div className="p-8 md:p-12">
+             
+             {/* Header Metadata */}
+             <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
+                <span className="inline-block px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase tracking-wider text-gray-600">
                   {entry.kind}
                 </span>
-                {/* RATING */}
                 <div className="flex gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <span key={i} className={`text-sm ${i < entry.rating ? 'text-black' : 'text-gray-200'}`}>★</span>
+                    <span key={i} className={`text-base ${i < entry.rating ? 'text-black' : 'text-gray-200'}`}>★</span>
                   ))}
                 </div>
              </div>
 
-             <h1 className="text-3xl font-black text-gray-900 mb-2 leading-tight">{entry.title}</h1>
-             <p className="text-lg text-gray-500 font-bold mb-6">{entry.creator}</p>
+             {/* Title & Creator */}
+             <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 leading-tight">
+                {entry.title}
+             </h1>
+             <p className="text-xl text-gray-500 font-bold mb-8">
+                {entry.creator}
+             </p>
              
-             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-               Experienced on {new Date(entry.event_date).toLocaleDateString()}
+             {/* Date */}
+             <div className="flex items-center gap-3 text-xs font-bold text-gray-400 uppercase tracking-widest mb-10 pb-10 border-b border-gray-100">
+               <span>{getDateLabel(entry.kind)} {new Date(entry.event_date).toLocaleDateString()}</span>
              </div>
-          </div>
+
+             {/* Reflection / Notes */}
+             {entry.reflection && (
+                <div>
+                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                        My Notes
+                    </h3>
+                    <div className="prose prose-lg prose-gray max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {entry.reflection}
+                    </div>
+                </div>
+             )}
         </div>
 
-        {/* REFLECTION BODY */}
-        {entry.reflection && (
-          <div className="p-8 border-t border-gray-50">
-            <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">My Notes</h3>
-            <div className="prose prose-gray max-w-none text-gray-600 leading-relaxed whitespace-pre-wrap">
-              {entry.reflection}
-            </div>
-          </div>
-        )}
-
       </article>
+
+      {/* MODAL OVERLAY */}
+      {showEntryForm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
+                <button 
+                  onClick={() => setShowEntryForm(false)}
+                  className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"
+                >
+                  <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
+                </button>
+
+                <EntryForm 
+                    entryToEdit={entry} 
+                    onUpdateEntry={handleUpdateEntry} 
+                    onCancel={() => setShowEntryForm(false)}
+                    onAddEntry={() => {}} 
+                />
+            </div>
+        </div>
+      )}
+
     </div>
   );
 }

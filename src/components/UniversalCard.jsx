@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, Plus, Edit2, Trash2, MapPin, Star } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, Star } from 'lucide-react';
 
-// --- HELPERS (Can be moved to a separate utils file later) ---
+// --- HELPERS ---
 function getCreatorLabel(cat) {
     if (cat === 'book') return 'Written by';
     if (cat === 'film') return 'Directed by';
@@ -18,7 +18,14 @@ function getCategoryColor(cat) {
     if (cat.includes('exhibition')) return 'bg-emerald-100 text-emerald-800';
     return 'bg-gray-100 text-gray-800';
 }
-// -----------------------------------------------------------
+
+function getDateLabel(cat) {
+    if (cat.includes('book')) return 'Read on';
+    if (cat.includes('film') || cat.includes('movie')) return 'Watched on';
+    if (cat.includes('exhibition') || cat.includes('museum') || cat.includes('gallery')) return 'Visited on';
+    if (cat.includes('concert') || cat.includes('theatre') || cat.includes('gig')) return 'Attended on';
+    return 'Logged on'; 
+}
 
 export default function UniversalCard({ item, type = 'public', onAction, onDelete }) {
   const navigate = useNavigate();
@@ -32,63 +39,95 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
   const rawDate = item.start_date || item.event_date || item.created_at;
   const dateObj = rawDate ? new Date(rawDate) : null;
   
-  const dateStr = dateObj && !isNaN(dateObj) ? dateObj.toLocaleDateString('en-IE', {day: 'numeric', month: '2-digit', year: 'numeric'}) : 'TBA';
+  // Date Strings
+  const dateStr = dateObj && !isNaN(dateObj) 
+    ? dateObj.toLocaleDateString('en-IE', {day: '2-digit', month: '2-digit', year: 'numeric'}) 
+    : 'TBA';
   const timeStr = dateObj && !isNaN(dateObj) ? dateObj.toLocaleTimeString('en-IE', { hour: 'numeric', minute: '2-digit' }) : '';
   const month = dateObj && !isNaN(dateObj) ? dateObj.toLocaleString('default', { month: 'short' }).toUpperCase() : '---';
   const day = dateObj && !isNaN(dateObj) ? dateObj.getDate() : '--';
-
-  const subtitle = type === 'entry' ? item.creator : item.venue;
-  const subtitleLabel = type === 'entry' ? getCreatorLabel(category) : null; 
   const rating = item.rating || 0;
 
+  // --- SUBTITLE LOGIC ---
+  let subtitle = null;
+  let subtitleLabel = null;
+
+  if (type === 'public') {
+      subtitle = item.venue;
+  } else {
+      const isLiveEvent = ['concert', 'music', 'theatre', 'arts', 'comedy', 'exhibition'].some(c => category.includes(c));
+      
+      if (isLiveEvent) {
+          if (item.venue) {
+              subtitle = item.venue;
+              subtitleLabel = category.includes('exhibition') ? 'Held at' : 'Performed at';
+          } else {
+              subtitle = item.creator;
+              subtitleLabel = 'Performed by';
+          }
+      } else {
+          subtitle = item.creator;
+          subtitleLabel = getCreatorLabel(category);
+      }
+  }
+
+  // --- HANDLER: Internal Navigation ---
+  const handleCardClick = () => {
+      navigate(type === 'entry' ? `/entry/${id}` : `/event/${id}`);
+  };
 
   // --- RENDER ---
   return (
     <div 
-      onClick={() => navigate(type === 'entry' ? `/entry/${id}` : `/event/${id}`)}
+      onClick={handleCardClick}
       className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex gap-4 sm:gap-5"
     >
       
-      {/* 1. LEFT: DATE BLOCK (Strong Visual Element) */}
-      <div className="flex-shrink-0 w-20 h-28 sm:w-24 sm:h-32 bg-gray-50 rounded-lg border border-gray-100 flex flex-col items-center justify-center text-center p-2">
-        <span className="text-xs font-bold text-red-600 uppercase tracking-wider">{month}</span>
-        <span className="text-3xl font-black text-gray-900 leading-none my-1">{day}</span>
-        <span className="text-[10px] text-gray-400 font-medium">{timeStr}</span>
+      {/* 1. LEFT: VISUAL (Image OR Date Block) */}
+      <div className="flex-shrink-0 w-20 h-28 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
+        {item.image_url ? (
+           // IF IMAGE EXISTS: Show it
+           <img 
+             src={item.image_url} 
+             alt={title} 
+             className="w-full h-full object-cover"
+             onError={(e) => {e.target.style.display='none';}} // Fallback logic could go here
+           />
+        ) : (
+           // NO IMAGE: Show Date Block
+           <div className="w-full h-full flex flex-col items-center justify-center text-center p-2">
+             <span className="text-xs font-bold text-red-600 uppercase tracking-wider">{month}</span>
+             <span className="text-3xl font-black text-gray-900 leading-none my-1">{day}</span>
+             <span className="text-[10px] text-gray-400 font-medium">{timeStr}</span>
+           </div>
+        )}
       </div>
 
-      {/* 2. MIDDLE: CONTENT & ACTIONS (Uses flex-grow/flex-col/justify-between) */}
-      <div className="flex-grow flex flex-col justify-between py-0.5 min-w-0">
+      {/* 2. MIDDLE: CONTENT & ACTIONS */}
+      <div className="flex-grow flex flex-col justify-between py-0.5 min-w-0 relative">
         
-        {/* TOP CONTENT BLOCK: Title, Subtitle, Date/Time */}
+        {/* TOP CONTENT BLOCK */}
         <div> 
           
-          {/* Header Row: Title and Metadata Block */}
-          <div className="flex justify-between items-start gap-2 mb-1">
-            <h3 className="font-black text-lg text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors pr-2">
+          {/* TITLE */}
+          <h3 className="font-black text-lg text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors mb-1 pr-24">
               {title}
-            </h3>
-            
-            {/* --- METADATA BLOCK (TOP RIGHT) --- */}
-            <div className="flex-shrink-0 flex flex-col items-end pt-1"> 
-                
-                {/* 1. Category Lozenges */}
-                <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide border border-transparent ${getCategoryColor(category)} mb-0.5`}>
-                  {category}
-                </span>
+          </h3>
 
-                {/* 2. Rating Stars (Entries ONLY) */}
-                {type === 'entry' && (
-                  <div className="flex gap-0.5 text-xs">
-                     {[...Array(5)].map((_, i) => (
-                       <Star key={i} className={`w-3 h-3 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
-                     ))}
+          {/* ABSOLUTE METADATA (Top Right) */}
+          <div className="absolute top-0 right-0 flex items-center gap-2"> 
+                {type === 'entry' && rating > 0 && (
+                  <div className="flex items-center bg-yellow-50 text-yellow-700 px-1.5 py-1 rounded-md border border-yellow-100">
+                     <span className="text-[10px] font-bold mr-0.5">{rating}</span>
+                     <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
                   </div>
                 )}
-            </div>
-            {/* ---------------------------------- */}
+                <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide border border-transparent ${getCategoryColor(category)}`}>
+                  {category}
+                </span>
           </div>
 
-          {/* Subtitle (Director or Venue) */}
+          {/* SUBTITLE */}
           <div className="mb-2">
              {subtitleLabel && (
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
@@ -96,59 +135,65 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                </p>
              )}
              <div className="flex items-center gap-1.5 text-sm font-bold text-gray-700 line-clamp-1">
-                {type === 'public' && <MapPin className="w-3.5 h-3.5 text-gray-400" />}
+                {(type === 'public' || (type === 'entry' && (subtitleLabel === 'Performed at' || subtitleLabel === 'Held at'))) && (
+                    <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                )}
                 {subtitle || 'Unknown'}
              </div>
           </div>
           
-          {/* Date Row (The data point the user is looking for) */}
+          {/* DATE ROW (Public Only - since Image might hide day/month) */}
           <div className="text-xs font-bold text-gray-500">
              {type === 'public' && <span>{dateStr} at {timeStr}</span>}
-             {type === 'entry' && <span className="text-xs font-bold text-gray-400">Logged on {dateStr}</span>}
           </div>
         </div>
         
-        {/* 3. BOTTOM ROW: ACTIONS - Pushed to the bottom */}
-        <div className="mt-3 pt-2 border-t border-gray-50 flex justify-end gap-3">
+        {/* 3. BOTTOM ROW: ACTIONS + DATE FOOTER */}
+        <div className="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center gap-3">
           
-          {type === 'entry' ? (
-            // ENTRY ACTIONS 
-            <>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
-                className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
-              >
-                <Edit2 className="w-3 h-3" /> Edit
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onDelete && onDelete(item.id); }}
-                className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-red-600 transition-colors"
-              >
-                <Trash2 className="w-3 h-3" /> Delete
-              </button>
-            </>
-          ) : (
-            // PUBLIC ACTIONS
-            <>
-              {item.external_url && (
-                <a 
-                  href={item.external_url} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
+          {/* LEFT: DYNAMIC DATE LABEL */}
+          <div className="text-[10px] font-bold text-gray-400">
+            {type === 'entry' && <span>{getDateLabel(category)} {dateStr}</span>}
+          </div>
+
+          {/* RIGHT: BUTTONS */}
+          <div className="flex gap-3">
+            {type === 'entry' ? (
+                <>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
+                    className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+                >
+                    <Edit2 className="w-3 h-3" /> Edit
+                </button>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete && onDelete(item.id); }}
+                    className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-red-600 transition-colors"
+                >
+                    <Trash2 className="w-3 h-3" /> Delete
+                </button>
+                </>
+            ) : (
+                <>
+                {/* PUBLIC: READ MORE (Internal Link) */}
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
                   className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" /> More Info
-                </a>
-              )}
-              <button 
-                onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
-                className="flex items-center gap-1 bg-black text-white text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-transform active:scale-95 shadow-sm ml-2"
-              >
-                <Plus className="w-3 h-3" /> Log This
-              </button>
-            </>
-          )}
+                  <span>Read more</span>
+                  <span className="text-base leading-none mb-0.5">→</span>
+                </button>
+
+                {/* PUBLIC: LOG THIS */}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
+                    className="flex items-center gap-1 bg-black text-white text-[10px] sm:text-xs font-bold px-3 py-1.5 rounded-full hover:bg-gray-800 transition-transform active:scale-95 shadow-sm ml-2"
+                >
+                    <Plus className="w-3 h-3" /> Log This
+                </button>
+                </>
+            )}
+          </div>
         </div>
       </div>
     </div>
