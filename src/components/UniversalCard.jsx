@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, MapPin, Star } from 'lucide-react';
 
-// --- HELPERS ---
+// --- HELPERS (Unchanged) ---
 function getCreatorLabel(cat) {
     if (cat === 'book') return 'Written by';
     if (cat === 'film') return 'Directed by';
@@ -30,7 +30,7 @@ function getDateLabel(cat) {
 export default function UniversalCard({ item, type = 'public', onAction, onDelete }) {
   const navigate = useNavigate();
 
-  // --- DATA NORMALIZATION ---
+  // --- DATA NORMALIZATION (Unchanged) ---
   const title = item.title;
   const id = item.id;
   const rawCategory = item.kind || item.category || 'event';
@@ -47,7 +47,6 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
   const day = dateObj && !isNaN(dateObj) ? dateObj.getDate() : '--';
   const rating = item.rating || 0;
 
-  // --- SUBTITLE LOGIC ---
   let subtitle = null;
   let subtitleLabel = null;
 
@@ -77,10 +76,12 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
   return (
     <div 
       onClick={handleCardClick}
+      // CSS FIX: 'flex-col' for mobile, 'sm:flex-row' for desktop
       className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex flex-col sm:flex-row gap-4 sm:gap-5"
     >
       
-      {/* 1. VISUAL */}
+      {/* 1. VISUAL (Image OR Date Block) */}
+      {/* CSS FIX: 'w-full h-40' for mobile banner, 'sm:w-24 sm:h-32' for desktop poster */}
       <div className="flex-shrink-0 w-full h-40 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
         {item.image_url ? (
            <img 
@@ -102,10 +103,12 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
       <div className="flex-grow flex flex-col justify-between py-0.5 min-w-0 relative">
         
         <div> 
+          {/* TITLE */}
           <h3 className="font-black text-lg text-gray-900 leading-tight line-clamp-2 group-hover:text-blue-600 transition-colors mb-1 pr-24">
               {title}
           </h3>
 
+          {/* BADGES */}
           <div className="absolute top-0 right-0 flex items-center gap-2"> 
                 {type === 'entry' && rating > 0 && (
                   <div className="flex items-center bg-yellow-50 text-yellow-700 px-1.5 py-1 rounded-md border border-yellow-100">
@@ -118,6 +121,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                 </span>
           </div>
 
+          {/* SUBTITLE */}
           <div className="mb-2">
              {subtitleLabel && (
                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
@@ -132,6 +136,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
              </div>
           </div>
           
+          {/* DATE ROW */}
           <div className="text-xs font-bold text-gray-500">
              {type === 'public' && <span>{dateStr} at {timeStr}</span>}
           </div>
@@ -144,7 +149,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
             {type === 'entry' && <span>{getDateLabel(category)} {dateStr}</span>}
           </div>
 
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-3">
             {type === 'entry' ? (
                 <>
                 <button 
@@ -162,32 +167,32 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                 </>
             ) : (
                 <>
-                {/* READ MORE: FONT SIZE FIXED */}
+                {/* READ MORE */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-blue-600 transition-colors"
+                  className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-colors"
                 >
                   <span>Read more</span>
                   <span className="text-base leading-none mb-0.5">→</span>
                 </button>
 
-                {/* LOG THIS: RESPONSIVE BUTTON */}
+                {/* LOG THIS (CSS FIX: Circle on Mobile, Pill on Desktop) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
                     className="
                         flex items-center justify-center 
                         bg-black text-white 
-                        hover:bg-gray-800 transition-transform active:scale-95 shadow-sm 
-                        ml-2
+                        hover:bg-gray-800 transition-transform active:scale-95 shadow-sm ml-2
                         
-                        /* MOBILE: Circle Button */
-                        w-8 h-8 rounded-full 
-                        sm:w-auto sm:h-auto sm:rounded-full sm:px-3 sm:py-1.5
+                        /* Mobile: Circle 32px */
+                        w-8 h-8 rounded-full p-0
+                        
+                        /* Desktop: Pill Shape */
+                        sm:w-auto sm:h-auto sm:px-3 sm:py-1.5 sm:gap-1
                     "
                 >
                     <Plus className="w-4 h-4 sm:w-3 sm:h-3" /> 
-                    {/* Desktop Text */}
-                    <span className="hidden sm:inline ml-1 text-[10px] sm:text-xs font-bold">Log This</span>
+                    <span className="hidden sm:inline text-[10px] sm:text-xs font-bold">Log This</span>
                 </button>
                 </>
             )}
