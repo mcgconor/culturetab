@@ -80,18 +80,20 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
   return (
     <div 
       onClick={handleCardClick}
-      className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex gap-4 sm:gap-5"
+      // LAYOUT FIX: Changed 'flex' to 'flex flex-col sm:flex-row'
+      className="group bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-gray-300 transition-all cursor-pointer relative flex flex-col sm:flex-row gap-4 sm:gap-5"
     >
       
       {/* 1. LEFT: VISUAL (Image OR Date Block) */}
-      <div className="flex-shrink-0 w-20 h-28 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
+      {/* LAYOUT FIX: Changed width/height to be full-width banner on mobile (w-full h-40), fixed size on desktop (sm:w-24 sm:h-32) */}
+      <div className="flex-shrink-0 w-full h-40 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
         {item.image_url ? (
            // IF IMAGE EXISTS: Show it
            <img 
              src={item.image_url} 
              alt={title} 
              className="w-full h-full object-cover"
-             onError={(e) => {e.target.style.display='none';}} // Fallback logic could go here
+             onError={(e) => {e.target.style.display='none';}} 
            />
         ) : (
            // NO IMAGE: Show Date Block
@@ -115,6 +117,8 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
           </h3>
 
           {/* ABSOLUTE METADATA (Top Right) */}
+          {/* Note: On mobile stack, this might overlap title if title is long. 
+              Ideally, for stacked layout, we might want this relative, but keeping absolute as requested. */}
           <div className="absolute top-0 right-0 flex items-center gap-2"> 
                 {type === 'entry' && rating > 0 && (
                   <div className="flex items-center bg-yellow-50 text-yellow-700 px-1.5 py-1 rounded-md border border-yellow-100">
@@ -142,7 +146,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
              </div>
           </div>
           
-          {/* DATE ROW (Public Only - since Image might hide day/month) */}
+          {/* DATE ROW */}
           <div className="text-xs font-bold text-gray-500">
              {type === 'public' && <span>{dateStr} at {timeStr}</span>}
           </div>
@@ -175,7 +179,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                 </>
             ) : (
                 <>
-                {/* PUBLIC: READ MORE (Internal Link) */}
+                {/* PUBLIC: READ MORE */}
                 <button 
                   onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
                   className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-widest text-gray-400 hover:text-blue-600 transition-colors"
