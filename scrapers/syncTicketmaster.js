@@ -25,26 +25,26 @@ if (!TM_API_KEY) {
 }
 
 const SCRAPER_NAME = 'Ticketmaster_Bot_v1';
-const MAX_PAGES_TO_SCAN = 5; // Will scan up to 500 events to get past the spam
+const MAX_PAGES_TO_SCAN = 5; 
 
-// --- CONFIG: EXCLUDED KEYWORDS ---
+// CONFIG: Date Window (30 Days)
+const NOW = new Date();
+const THIRTY_DAYS_LATER = new Date();
+THIRTY_DAYS_LATER.setDate(NOW.getDate() + 30);
+
+// Format for API: YYYY-MM-DDTHH:mm:ssZ
+const startDateTime = NOW.toISOString().split('.')[0] + "Z";
+const endDateTime = THIRTY_DAYS_LATER.toISOString().split('.')[0] + "Z";
+
 const EXCLUDED_TERMS = [
-  'santa', 
-  'grotto', 
-  'winter wonderland', 
-  'elf', 
-  'lapland', 
-  'polar express', 
-  'christmas experience',
-  'magical experience'
+  'santa', 'grotto', 'winter wonderland', 'elf', 'lapland', 
+  'polar express', 'christmas experience', 'magical experience'
 ];
 
-// --- HELPER: DESCRIPTION CLEANER ---
 function getBestDescription(event) {
     const info = event.info || '';
     const pleaseNote = event.pleaseNote || '';
     const rawDesc = event.description || '';
-
     const isLikelyID = !rawDesc.includes(' ') && rawDesc.length < 20;
     const cleanDesc = isLikelyID ? '' : rawDesc;
 
@@ -58,11 +58,9 @@ function getBestDescription(event) {
         if (segment && genre) return `${segment} Event - ${genre}`;
         if (segment) return `${segment} Event`;
     }
-
     return null; 
 }
 
-// --- MAIN SCRAPER ---
 async function syncTicketmaster() {
   console.log(`🎟️ Starting ${SCRAPER_NAME}...`);
   const startTime = Date.now();
@@ -81,17 +79,16 @@ async function syncTicketmaster() {
     let totalSkipped = 0;
     let totalProcessed = 0;
 
-    // --- PAGINATION LOOP ---
     for (let page = 0; page < MAX_PAGES_TO_SCAN; page++) {
         console.log(`\n📄 Scanning Page ${page + 1} of ${MAX_PAGES_TO_SCAN}...`);
         
-        // Add &page=${page} to the URL
-        const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TM_API_KEY}&locale=*&city=Dublin&countryCode=IE&sort=date,asc&size=100&page=${page}`;
+        // ADDED: startDateTime and endDateTime to fetch 1 month window
+        const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TM_API_KEY}&locale=*&city=Dublin&countryCode=IE&sort=date,asc&size=100&page=${page}&startDateTime=${startDateTime}&endDateTime=${endDateTime}`;
         
         const response = await fetch(url);
         if (!response.ok) {
-            console.error(`⚠️ TM API Error on page ${page}: ${response.status} ${response.statusText}`);
-            continue; // Try next page even if one fails
+            console.error(`⚠️ TM API Error on page ${page}: ${response.status}`);
+            continue; 
         }
         
         const data = await response.json();
@@ -99,27 +96,22 @@ async function syncTicketmaster() {
 
         if (events.length === 0) {
             console.log('✅ No more events found.');
-            break; // Stop loop if API runs dry
+            break; 
         }
 
         for (const event of events) {
             totalProcessed++;
 
-            // A. Basic Validation
             if (!event.dates || !event.dates.start || !event.dates.start.dateTime) continue;
 
-            // B. KEYWORD FILTERING
             const titleLower = event.name.toLowerCase();
             if (EXCLUDED_TERMS.some(term => titleLower.includes(term))) {
-                // console.log(`🚫 Skipping: ${event.name}`); // Commented out to reduce noise
                 totalSkipped++;
                 continue;
             }
 
-            // C. Data Normalization
             const venueRaw = event._embedded && event._embedded.venues ? event._embedded.venues[0].name : 'Dublin Venue';
             const venueClean = normaliseVenue(venueRaw);
-            
             const bestImage = event.images.sort((a, b) => b.width - a.width)[0]?.url || null;
 
             let category = 'event';
@@ -131,6 +123,8 @@ async function syncTicketmaster() {
             }
 
             const eventData = {
+                // ROBUST DEDUPE: Use Ticketmaster's ID
+                external_id: event.id, 
                 title: event.name,
                 description: getBestDescription(event),
                 start_date: event.dates.start.dateTime,
@@ -138,16 +132,18 @@ async function syncTicketmaster() {
                 image_url: bestImage,
                 external_url: event.url,
                 category: category,
-                scraper_source: SCRAPER_NAME
+                scraper_source: SCRAPER_NAME,
+                // Explicitly set source for your display logic
+                source: 'ticketmaster'
             };
 
-            // D. Upsert
+            // D. ROBUST UPSERT CHECK
+            // We check ONLY the external_id. 
+            // This means if you change the venue name in the DB, this scraper won't overwrite it or create a dupe.
             const { data: existing } = await supabase
                 .from('public_events')
                 .select('id')
-                .eq('title', eventData.title)
-                .eq('venue', eventData.venue)
-                .eq('start_date', eventData.start_date)
+                .eq('external_id', eventData.external_id)
                 .single();
 
             if (!existing) {
@@ -159,16 +155,17 @@ async function syncTicketmaster() {
                     totalAdded++;
                     console.log(`   ✨ Added: ${eventData.title}`);
                 }
+            } else {
+                // Optional: Update data if needed, but usually we skip to preserve manual edits
+                // console.log(`   Existing: ${eventData.title}`);
             }
         }
         
-        // Respect API rate limits (pause 1s between pages)
         await new Promise(r => setTimeout(r, 1000));
     }
 
     console.log(`\n🚀 FINISHED! Processed ${totalProcessed} items.`);
     console.log(`   ✅ Added: ${totalAdded} new valid events.`);
-    console.log(`   🚫 Skipped: ${totalSkipped} spam/excluded events.`);
 
     if (logId) {
         await supabase.from('scraper_logs').update({ 

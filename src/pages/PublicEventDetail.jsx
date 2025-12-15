@@ -13,19 +13,59 @@ function getHighResImageUrl(url) {
   return url;
 }
 
+// --- HELPER: Determine Source Label (Root Domain Only) ---
 function getSourceName(event) {
     if (!event) return '';
-    if (event.scraper_source && event.scraper_source.includes('IFI')) return 'Irish Film Institute';
+
+    // 1. IFI Check
+    if (event.scraper_source && event.scraper_source.includes('IFI')) {
+        return 'Irish Film Institute';
+    }
+
+    // 2. Domain Name Check
     if (event.external_url) {
         try {
-            const hostname = new URL(event.external_url).hostname;
-            const cleanHost = hostname.replace('www.', '').replace('m.', '');
-            if (cleanHost.includes('ticketmaster')) return 'Ticketmaster';
-            if (cleanHost.includes('ifi.ie')) return 'Irish Film Institute';
-            return cleanHost;
-        } catch (error) { }
+            const urlObj = new URL(event.external_url);
+            let hostname = urlObj.hostname; // e.g. "booking.nch.ie"
+
+            // Remove 'www.'
+            hostname = hostname.replace(/^www\./, '');
+
+            // STRIP SUBDOMAINS (The "Root Domain" Logic)
+            // Strategy: Take the last two parts (e.g. "nch.ie", "google.com")
+            // Exception: "co.uk" domains need 3 parts (e.g. "bbc.co.uk")
+            const parts = hostname.split('.');
+            
+            if (parts.length > 2) {
+                // Check for common double-endings like .co.uk, .com.au, .org.uk
+                const secondLast = parts[parts.length - 2];
+                const specialSLDs = ['co', 'com', 'org', 'net', 'gov', 'edu'];
+                
+                if (specialSLDs.includes(secondLast) && parts.length >= 3) {
+                    // It's like "bbc.co.uk" -> take last 3
+                    hostname = parts.slice(-3).join('.');
+                } else {
+                    // It's like "booking.nch.ie" -> take last 2
+                    hostname = parts.slice(-2).join('.');
+                }
+            }
+
+            // Map known domains to Clean Names
+            if (hostname === 'ticketmaster.ie') return 'Ticketmaster';
+            if (hostname === 'ifi.ie') return 'Irish Film Institute';
+            if (hostname === 'nch.ie') return 'National Concert Hall';
+            if (hostname === 'riam.ie') return 'RIAM';
+            if (hostname === 'journalofmusic.com') return 'Journal of Music'; // Fallback if link is internal
+
+            return hostname; // Returns "nch.ie", "boardgaisenergytheatre.ie", etc.
+        } catch (error) { 
+            // If URL parsing fails, ignore
+        }
     }
+
+    // 3. Fallback to DB source column
     if (event.source === 'ticketmaster') return 'Ticketmaster';
+    
     return event.source || 'External Source';
 }
 
@@ -142,8 +182,9 @@ export default function PublicEventDetail({ session }) {
                 </span>
              </div>
 
-             <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 leading-tight">{event.title}</h1>
-             
+             <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 leading-tight">
+   {event.title}
+</h1>
              <div className="flex items-center gap-2 text-xl text-gray-500 font-bold mb-8">
                 <MapPin className="w-5 h-5 text-gray-400" />
                 {event.venue || 'Dublin City'}
