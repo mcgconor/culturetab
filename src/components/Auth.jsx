@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useLocation } from 'react-router-dom'; // <--- IMPORT THIS
 import EntryForm from './EntryForm';
-import PublicNav from './PublicNav'; // <--- IMPORT THIS
+import PublicNav from './PublicNav';
+import Footer from './Footer'; 
 
 export default function Auth() {
+  const location = useLocation(); // <--- USE LOCATION
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -13,6 +16,15 @@ export default function Auth() {
   const [showGuestForm, setShowGuestForm] = useState(false); 
   
   const [pendingData, setPendingData] = useState(null);
+
+  // LISTENER: Check if we were redirected here with a request to open login
+  useEffect(() => {
+    if (location.state?.openLogin) {
+      setShowLoginModal(true);
+      // Clean up the state so a refresh doesn't keep opening it
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleMagicLink = async (e) => {
     e.preventDefault();
@@ -43,25 +55,25 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-white animate-fade-in">
+    <div className="min-h-screen bg-white animate-fade-in flex flex-col justify-between">
       
-      {/* 1. PUBLIC NAVIGATION (Logo Header) */}
-      <PublicNav />
+      {/* 1. PUBLIC NAVIGATION */}
+      <PublicNav onSignInClick={() => setShowLoginModal(true)} />
 
       {/* 2. MAIN CONTENT */}
-      <div className="max-w-3xl mx-auto px-4 py-12 sm:pt-20">
+      <div className="flex-grow w-full max-w-3xl mx-auto px-4 py-12 sm:pt-20">
         
         {/* HERO SECTION */}
         <div className="text-center mb-10 animate-fade-in-down">
           <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
             Start your CultureLog.
           </h1>
-          <p className="text-xl text-gray-500 mb-8">
+          <p className="text-lg text-gray-500 mb-8">
             Track the books, films, and art that matter to you. <br/>
             <span className="font-bold text-gray-900">Try it now — no account needed yet.</span>
           </p>
 
-          {/* THE TRIGGER BUTTON (Only visible if form is hidden) */}
+          {/* THE TRIGGER BUTTON */}
           {!showGuestForm && (
             <div className="space-y-4">
               <button 
@@ -83,7 +95,7 @@ export default function Auth() {
           )}
         </div>
 
-        {/* GUEST FORM (Slides down when active) */}
+        {/* GUEST FORM */}
         {showGuestForm && !submitted && !showLoginModal && (
           <div className="animate-fade-in-down">
             <EntryForm 
@@ -95,7 +107,10 @@ export default function Auth() {
 
       </div>
 
-      {/* 3. THE LOGIN / SAVE MODAL */}
+      {/* 3. FOOTER */}
+      <Footer />
+
+      {/* 4. MODALS */}
       {(showLoginModal || submitted) && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
