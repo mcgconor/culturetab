@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import EntryForm from './EntryForm';
+import PublicNav from './PublicNav'; // <--- IMPORT THIS
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
@@ -8,7 +9,7 @@ export default function Auth() {
   const [submitted, setSubmitted] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   
-  // NEW: Toggle to show/hide the guest form
+  // Toggle to show/hide the guest form
   const [showGuestForm, setShowGuestForm] = useState(false); 
   
   const [pendingData, setPendingData] = useState(null);
@@ -42,55 +43,62 @@ export default function Auth() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
+    <div className="min-h-screen bg-white animate-fade-in">
       
-      {/* 1. HERO SECTION */}
-      <div className="text-center mb-10 animate-fade-in-down">
-        {/* Updated Font Weight and Tracking */}
-        <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
-          Start your CultureLog.
-        </h1>
-        <p className="text-xl text-gray-500 mb-8">
-          Track the books, films, and art that matter to you. <br/>
-          <span className="font-bold text-gray-900">Try it now — no account needed yet.</span>
-        </p>
+      {/* 1. PUBLIC NAVIGATION (Logo Header) */}
+      <PublicNav />
 
-        {/* THE TRIGGER BUTTON (Only visible if form is hidden) */}
-        {!showGuestForm && (
-          <div className="space-y-4">
-            <button 
-              onClick={() => setShowGuestForm(true)}
-              className="bg-black text-white text-lg font-bold py-4 px-8 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all shadow-lg hover:shadow-xl"
-            >
-              + Log New Entry
-            </button>
-            
-            <div className="pt-2">
+      {/* 2. MAIN CONTENT */}
+      <div className="max-w-3xl mx-auto px-4 py-12 sm:pt-20">
+        
+        {/* HERO SECTION */}
+        <div className="text-center mb-10 animate-fade-in-down">
+          <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
+            Start your CultureLog.
+          </h1>
+          <p className="text-xl text-gray-500 mb-8">
+            Track the books, films, and art that matter to you. <br/>
+            <span className="font-bold text-gray-900">Try it now — no account needed yet.</span>
+          </p>
+
+          {/* THE TRIGGER BUTTON (Only visible if form is hidden) */}
+          {!showGuestForm && (
+            <div className="space-y-4">
               <button 
-                onClick={() => setShowLoginModal(true)}
-                className="text-sm font-bold text-gray-400 hover:text-black transition-colors"
+                onClick={() => setShowGuestForm(true)}
+                className="bg-black text-white text-lg font-bold py-4 px-8 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all shadow-lg hover:shadow-xl"
               >
-                Already have an account? Sign in
+                + Log New Entry
               </button>
+              
+              <div className="pt-2">
+                <button 
+                  onClick={() => setShowLoginModal(true)}
+                  className="text-sm font-bold text-gray-400 hover:text-black transition-colors"
+                >
+                  Already have an account? Sign in
+                </button>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* GUEST FORM (Slides down when active) */}
+        {showGuestForm && !submitted && !showLoginModal && (
+          <div className="animate-fade-in-down">
+            <EntryForm 
+              onAddEntry={handleGuestSubmit} 
+              onCancel={() => setShowGuestForm(false)} 
+            />
           </div>
         )}
-      </div>
 
-      {/* 2. THE GUEST FORM (Slides down when active) */}
-      {showGuestForm && !submitted && !showLoginModal && (
-        <div className="animate-fade-in-down">
-          <EntryForm 
-            onAddEntry={handleGuestSubmit} 
-            onCancel={() => setShowGuestForm(false)} // Close form on cancel
-          />
-        </div>
-      )}
+      </div>
 
       {/* 3. THE LOGIN / SAVE MODAL */}
       {(showLoginModal || submitted) && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
             
             {submitted ? (
               <div className="text-center">
