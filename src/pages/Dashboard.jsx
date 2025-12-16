@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react'; // Added useRef
 import { supabase } from '../supabaseClient';
 import UnifiedFeed from '../components/UnifiedFeed'; 
 import EntryForm from '../components/EntryForm'; 
@@ -43,9 +43,16 @@ export default function Dashboard({ session: propSession, logTrigger }) {
   const [feedKey, setFeedKey] = useState(0); 
   const navigate = useNavigate();
 
+  // FIX: Track the previous trigger value so we don't open on mount
+  const prevLogTrigger = useRef(logTrigger);
+
   // LISTEN FOR HEADER CLICK (From Layout)
   useEffect(() => {
-    if (logTrigger > 0) handleOpenNew();
+    // Only open if the trigger has INCREASED since the last render
+    if (logTrigger > prevLogTrigger.current) {
+      handleOpenNew();
+      prevLogTrigger.current = logTrigger;
+    }
   }, [logTrigger]);
 
   useEffect(() => {
@@ -140,7 +147,7 @@ export default function Dashboard({ session: propSession, logTrigger }) {
             Welcome back, {profile?.username || 'there'}.
          </h1>
          <p className="text-lg text-gray-500 max-w-xl leading-relaxed">
-            Ready to log your latest culture fix?
+            Ready to keep tabs on your latest culture fix?
          </p>
          <div className="h-px bg-gray-100 w-full mt-8 mb-8"></div>
       </div>

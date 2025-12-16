@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, Calendar, Clock, Plus, LogOut, User, Mail } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; // Added Link
+import { Home, Calendar, Clock, Plus, LogOut, User, Mail, Menu, X, Settings } from 'lucide-react'; // Added Settings Icon
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 export default function TopNav({ onLogClick, session }) {
@@ -28,7 +28,7 @@ export default function TopNav({ onLogClick, session }) {
   };
 
   const navItems = [
-    { id: 'home', icon: Home, label: 'Dash', path: '/' },
+    { id: 'home', icon: Home, label: 'Home', path: '/' },
     { id: 'events', icon: Calendar, label: 'Events', path: '/events' },
     { id: 'history', icon: Clock, label: 'History', path: '/history' },
   ];
@@ -37,7 +37,7 @@ export default function TopNav({ onLogClick, session }) {
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm transition-all">
       <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
         
-        {/* LOGO: Link to Dashboard */}
+        {/* LEFT: Logo */}
         <Link 
             to="/" 
             className="font-black text-xl tracking-tighter text-gray-900 select-none hover:opacity-80 transition-opacity"
@@ -45,8 +45,8 @@ export default function TopNav({ onLogClick, session }) {
             CultureTab.
         </Link>
 
-        {/* CENTER: Main Navigation */}
-        <nav className="flex items-center gap-1 sm:gap-6">
+        {/* CENTER: Desktop Navigation */}
+        <nav className="hidden sm:flex items-center gap-6">
             {navItems.map((item) => {
                 const active = isActive(item.path);
                 return (
@@ -54,52 +54,77 @@ export default function TopNav({ onLogClick, session }) {
                         key={item.id}
                         onClick={() => navigate(item.path)}
                         className={`
-                            relative px-3 py-2 rounded-lg flex flex-col sm:flex-row items-center gap-1.5 transition-all
+                            relative px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all
                             ${active ? 'bg-gray-100 text-black' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}
                         `}
                     >
                         <item.icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wide ${active ? 'text-black' : 'text-gray-400'}`}>
+                        <span className={`text-xs font-bold uppercase tracking-wide ${active ? 'text-black' : 'text-gray-400'}`}>
                             {item.label}
                         </span>
-                        {active && <span className="absolute bottom-1 w-1 h-1 bg-black rounded-full sm:hidden"></span>}
                     </button>
                 );
             })}
         </nav>
 
         {/* RIGHT: Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-3">
             
-            {/* LOG BUTTON */}
+            {/* TAB BUTTON */}
             <button 
                 onClick={onLogClick}
                 className="bg-black text-white p-2 sm:px-4 sm:py-2 rounded-full sm:rounded-xl shadow-md hover:bg-gray-800 transition-transform active:scale-95 flex items-center gap-2"
             >
                 <Plus className="w-5 h-5" />
-                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Log</span>
+                <span className="hidden sm:inline text-xs font-bold uppercase tracking-wider">Tab</span>
             </button>
 
-            {/* USER MENU DROPDOWN */}
+            {/* HAMBURGER / USER MENU */}
             <div className="relative" ref={menuRef}>
                 <button 
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className={`p-2 rounded-full transition-colors border border-transparent ${isMenuOpen ? 'bg-gray-100 border-gray-200' : 'hover:bg-gray-100'}`}
                 >
-                    <User className="w-5 h-5 text-gray-700" />
+                    <div className="sm:hidden">
+                        {isMenuOpen ? <X className="w-5 h-5 text-gray-900" /> : <Menu className="w-5 h-5 text-gray-900" />}
+                    </div>
+                    <div className="hidden sm:block">
+                        <User className="w-5 h-5 text-gray-700" />
+                    </div>
                 </button>
 
-                {/* THE DROPDOWN */}
+                {/* DROPDOWN MENU */}
                 {isMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-2 animate-fade-in origin-top-right overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-2 animate-fade-in origin-top-right overflow-hidden">
                         
+                        {/* User Info */}
                         <div className="px-3 py-2 border-b border-gray-50 mb-1">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Signed in as</p>
                             <p className="text-sm font-bold text-gray-900 truncate">{session?.user?.email}</p>
                         </div>
 
+                        {/* MOBILE-ONLY NAVIGATION LINKS */}
+                        <div className="sm:hidden space-y-1 mb-2">
+                             {navItems.map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => { navigate(item.path); setIsMenuOpen(false); }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ${isActive(item.path) ? 'bg-gray-100 text-black' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <item.icon className="w-4 h-4" /> {item.label}
+                                </button>
+                             ))}
+                             <div className="h-px bg-gray-100 my-1"></div>
+                        </div>
+
+                        {/* Standard Actions */}
                         <button onClick={() => navigate('/contact')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-black transition-colors">
                             <Mail className="w-4 h-4" /> Contact Support
+                        </button>
+
+                        {/* NEW: SETTINGS LINK */}
+                        <button onClick={() => { navigate('/settings'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-black transition-colors">
+                            <Settings className="w-4 h-4" /> Settings
                         </button>
                         
                         <div className="h-px bg-gray-100 my-1"></div>
@@ -110,7 +135,6 @@ export default function TopNav({ onLogClick, session }) {
                     </div>
                 )}
             </div>
-
         </div>
 
       </div>

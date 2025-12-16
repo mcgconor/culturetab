@@ -66,10 +66,10 @@ export default function Auth() {
         {/* HERO SECTION */}
         <div className="text-center mb-10 animate-fade-in-down">
           <h1 className="text-5xl font-black tracking-tighter text-gray-900 mb-4">
-            Start your CultureLog.
+            Start your CultureTab.
           </h1>
           <p className="text-lg text-gray-500 mb-8">
-            Track the books, films, and art that matter to you. <br/>
+            Keep a tab on the books, films, and art that matter to you. <br/>
             <span className="font-bold text-gray-900">Try it now — no account needed yet.</span>
           </p>
 

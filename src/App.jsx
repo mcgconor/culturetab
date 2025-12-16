@@ -12,11 +12,11 @@ import PublicEventDetail from './pages/PublicEventDetail';
 import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import Settings from './pages/Settings'; // <--- ADD IMPORT
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  
   const [logTrigger, setLogTrigger] = useState(0);
 
   useEffect(() => {
@@ -39,41 +39,36 @@ export default function App() {
     <Router>
       <Routes>
         
-        {/* === PUBLIC ROUTES (Logged Out) === */}
+        {/* === PUBLIC ROUTES === */}
         {!session ? (
             <>
-              {/* Home Page */}
               <Route path="/" element={<Auth />} />
-              
-              {/* Secondary Pages (Wrapped in PublicLayout so they get Header/Footer) */}
               <Route element={<PublicLayout />}>
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
               </Route>
-
-              {/* FIX: Redirect /events to Home, but tell Home to OPEN THE LOGIN MODAL */}
               <Route path="/events" element={<Navigate to="/" state={{ openLogin: true }} replace />} />
-              
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
         ) : (
             <>
-              {/* === PROTECTED ROUTES (Logged In) === */}
+              {/* === PROTECTED ROUTES === */}
               <Route element={<Layout session={session} onLogClick={() => setLogTrigger(t => t + 1)} />}>
                   <Route path="/" element={<Dashboard session={session} logTrigger={logTrigger} />} />
                   <Route path="/events" element={<Events session={session} logTrigger={logTrigger} />} />
                   <Route path="/history" element={<History session={session} logTrigger={logTrigger} />} />
                   
-                  {/* Reuse same pages for logged-in users */}
+                  {/* DETAIL PAGES */}
+                  <Route path="/entry/:id" element={<EntryDetail />} />
+                  <Route path="/event/:id" element={<PublicEventDetail session={session} logTrigger={logTrigger} />} />
+
+                  {/* FOOTER & SETTINGS */}
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
+                  <Route path="/settings" element={<Settings session={session} />} /> {/* <--- ADD ROUTE */}
               </Route>
-
-              {/* STANDALONE PROTECTED PAGES */}
-              <Route path="/entry/:id" element={<EntryDetail />} />
-              <Route path="/event/:id" element={<PublicEventDetail session={session} />} />
               
               <Route path="*" element={<Navigate to="/" replace />} />
             </>

@@ -102,7 +102,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, init
       
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-black text-gray-900 tracking-tight">
-          {entryToEdit ? 'Edit Entry' : 'Log New Entry'}
+          {/* UPDATED TEXT ONLY */}
+          {entryToEdit ? 'Edit your tab' : 'Keep a tab on something new'}
         </h2>
       </div>
 
@@ -247,7 +248,8 @@ export default function EntryForm({ onAddEntry, onUpdateEntry, entryToEdit, init
             type="submit" 
             className="flex-[2] bg-black text-white font-bold h-14 rounded-xl hover:bg-gray-800 transform active:scale-[0.98] transition-all shadow-md"
           >
-            {entryToEdit ? 'Update Entry' : 'Save Entry'}
+            {/* UPDATED TEXT ONLY */}
+            {entryToEdit ? 'Update Tab' : 'Save Tab'}
           </button>
         </div>
       </form>

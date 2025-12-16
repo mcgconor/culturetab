@@ -32,32 +32,26 @@ function getSourceName(event) {
             hostname = hostname.replace(/^www\./, '');
 
             // STRIP SUBDOMAINS (The "Root Domain" Logic)
-            // Strategy: Take the last two parts (e.g. "nch.ie", "google.com")
-            // Exception: "co.uk" domains need 3 parts (e.g. "bbc.co.uk")
             const parts = hostname.split('.');
             
             if (parts.length > 2) {
-                // Check for common double-endings like .co.uk, .com.au, .org.uk
                 const secondLast = parts[parts.length - 2];
                 const specialSLDs = ['co', 'com', 'org', 'net', 'gov', 'edu'];
                 
                 if (specialSLDs.includes(secondLast) && parts.length >= 3) {
-                    // It's like "bbc.co.uk" -> take last 3
                     hostname = parts.slice(-3).join('.');
                 } else {
-                    // It's like "booking.nch.ie" -> take last 2
                     hostname = parts.slice(-2).join('.');
                 }
             }
 
-            // Map known domains to Clean Names
             if (hostname === 'ticketmaster.ie') return 'Ticketmaster';
             if (hostname === 'ifi.ie') return 'Irish Film Institute';
             if (hostname === 'nch.ie') return 'National Concert Hall';
             if (hostname === 'riam.ie') return 'RIAM';
-            if (hostname === 'journalofmusic.com') return 'Journal of Music'; // Fallback if link is internal
+            if (hostname === 'journalofmusic.com') return 'Journal of Music'; 
 
-            return hostname; // Returns "nch.ie", "boardgaisenergytheatre.ie", etc.
+            return hostname; 
         } catch (error) { 
             // If URL parsing fails, ignore
         }
@@ -78,11 +72,9 @@ function mapCategoryToKind(cat) {
     return c; 
 }
 
-// FIX: Removed Year Logic
 async function fetchDirector(title) {
     if (!TMDB_API_KEY || !title) return '';
     try {
-        // Search strictly by title
         const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
         const searchData = await searchRes.json();
         const movie = searchData.results?.[0];
@@ -159,11 +151,13 @@ export default function PublicEventDetail({ session }) {
   const sourceLabel = getSourceName(event);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 animate-fade-in relative">
+    <div className="min-h-screen py-12 px-4 animate-fade-in relative">
       <div className="max-w-3xl mx-auto mb-6 flex justify-between items-center">
         <button onClick={() => navigate(-1)} className="text-sm font-bold text-gray-400 hover:text-black">← Back</button>
+        
+        {/* UPDATED BUTTON TEXT */}
         <button onClick={handleLogClick} disabled={isPreparingLog} className="bg-black text-white font-bold text-xs px-4 py-2 rounded-lg hover:bg-gray-800 transition-transform active:scale-95 shadow-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait">
-            {isPreparingLog ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching info...</> : <><Plus className="w-3 h-3" /> Log This</>}
+            {isPreparingLog ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching info...</> : <><Plus className="w-3 h-3" /> Tab</>}
         </button>
       </div>
 
@@ -183,8 +177,8 @@ export default function PublicEventDetail({ session }) {
              </div>
 
              <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-2 leading-tight">
-   {event.title}
-</h1>
+               {event.title}
+             </h1>
              <div className="flex items-center gap-2 text-xl text-gray-500 font-bold mb-8">
                 <MapPin className="w-5 h-5 text-gray-400" />
                 {event.venue || 'Dublin City'}

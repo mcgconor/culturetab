@@ -74,7 +74,8 @@ export default function EntryDetail() {
   const highResImage = getHighResImageUrl(entry.image_url);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 animate-fade-in relative">
+    // FIX: Removed 'bg-gray-50'
+    <div className="min-h-screen py-12 px-4 animate-fade-in relative">
       
       {/* NAV */}
       <div className="max-w-3xl mx-auto mb-6 flex justify-between items-center">

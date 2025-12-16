@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit2, Trash2, MapPin, Star } from 'lucide-react';
 
-// --- HELPERS (Unchanged) ---
+// --- HELPERS ---
 function getCreatorLabel(cat) {
     if (cat === 'book') return 'Written by';
     if (cat === 'film') return 'Directed by';
@@ -30,7 +30,7 @@ function getDateLabel(cat) {
 export default function UniversalCard({ item, type = 'public', onAction, onDelete }) {
   const navigate = useNavigate();
 
-  // --- DATA NORMALIZATION (Unchanged) ---
+  // --- DATA NORMALIZATION ---
   const title = item.title;
   const id = item.id;
   const rawCategory = item.kind || item.category || 'event';
@@ -81,7 +81,6 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
     >
       
       {/* 1. VISUAL (Image OR Date Block) */}
-      {/* CSS FIX: 'w-full h-40' for mobile banner, 'sm:w-24 sm:h-32' for desktop poster */}
       <div className="flex-shrink-0 w-full h-40 sm:w-24 sm:h-32 rounded-lg border border-gray-100 overflow-hidden bg-gray-50">
         {item.image_url ? (
            <img 
@@ -176,7 +175,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                   <span className="text-base leading-none mb-0.5">→</span>
                 </button>
 
-                {/* LOG THIS (CSS FIX: Circle on Mobile, Pill on Desktop) */}
+                {/* TAB THIS BUTTON */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onAction && onAction(item); }}
                     className="
@@ -192,7 +191,7 @@ export default function UniversalCard({ item, type = 'public', onAction, onDelet
                     "
                 >
                     <Plus className="w-4 h-4 sm:w-3 sm:h-3" /> 
-                    <span className="hidden sm:inline text-[10px] sm:text-xs font-bold">Log This</span>
+                    <span className="hidden sm:inline text-[10px] sm:text-xs font-bold">Tab</span>
                 </button>
                 </>
             )}
