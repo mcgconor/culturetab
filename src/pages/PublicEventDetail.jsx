@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import EntryForm from '../components/EntryForm'; 
-import { Plus, MapPin, Calendar, ExternalLink, Loader2 } from 'lucide-react'; 
+import { Plus, MapPin, Calendar, ExternalLink, Loader2, X } from 'lucide-react'; 
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
@@ -13,53 +13,29 @@ function getHighResImageUrl(url) {
   return url;
 }
 
-// --- HELPER: Determine Source Label (Root Domain Only) ---
 function getSourceName(event) {
     if (!event) return '';
-
-    // 1. IFI Check
-    if (event.scraper_source && event.scraper_source.includes('IFI')) {
-        return 'Irish Film Institute';
-    }
-
-    // 2. Domain Name Check
+    if (event.scraper_source && event.scraper_source.includes('IFI')) return 'Irish Film Institute';
     if (event.external_url) {
         try {
             const urlObj = new URL(event.external_url);
-            let hostname = urlObj.hostname; // e.g. "booking.nch.ie"
-
-            // Remove 'www.'
-            hostname = hostname.replace(/^www\./, '');
-
-            // STRIP SUBDOMAINS (The "Root Domain" Logic)
+            let hostname = urlObj.hostname.replace(/^www\./, '');
             const parts = hostname.split('.');
-            
             if (parts.length > 2) {
                 const secondLast = parts[parts.length - 2];
                 const specialSLDs = ['co', 'com', 'org', 'net', 'gov', 'edu'];
-                
-                if (specialSLDs.includes(secondLast) && parts.length >= 3) {
-                    hostname = parts.slice(-3).join('.');
-                } else {
-                    hostname = parts.slice(-2).join('.');
-                }
+                if (specialSLDs.includes(secondLast) && parts.length >= 3) hostname = parts.slice(-3).join('.');
+                else hostname = parts.slice(-2).join('.');
             }
-
             if (hostname === 'ticketmaster.ie') return 'Ticketmaster';
             if (hostname === 'ifi.ie') return 'Irish Film Institute';
             if (hostname === 'nch.ie') return 'National Concert Hall';
             if (hostname === 'riam.ie') return 'RIAM';
             if (hostname === 'journalofmusic.com') return 'Journal of Music'; 
-
             return hostname; 
-        } catch (error) { 
-            // If URL parsing fails, ignore
-        }
+        } catch (error) { }
     }
-
-    // 3. Fallback to DB source column
     if (event.source === 'ticketmaster') return 'Ticketmaster';
-    
     return event.source || 'External Source';
 }
 
@@ -78,9 +54,7 @@ async function fetchDirector(title) {
         const searchRes = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
         const searchData = await searchRes.json();
         const movie = searchData.results?.[0];
-        
         if (!movie) return '';
-
         const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
         const creditsData = await creditsRes.json();
         const director = creditsData.crew?.find(person => person.job === 'Director');
@@ -88,7 +62,7 @@ async function fetchDirector(title) {
     } catch (e) { return ''; }
 }
 
-export default function PublicEventDetail({ session }) {
+export default function PublicEventDetail({ session, logTrigger }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
@@ -96,6 +70,16 @@ export default function PublicEventDetail({ session }) {
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [preFillData, setPreFillData] = useState(null);
   const [isPreparingLog, setIsPreparingLog] = useState(false);
+  const prevLogTrigger = useRef(logTrigger);
+
+  useEffect(() => {
+    if (logTrigger > prevLogTrigger.current) {
+        // Here we just open blank form if clicked from header, or handle logic if context needed
+        // For now, simpler to just open:
+        setShowEntryForm(true);
+        prevLogTrigger.current = logTrigger;
+    }
+  }, [logTrigger]);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -111,10 +95,7 @@ export default function PublicEventDetail({ session }) {
     setIsPreparingLog(true);
     const kind = mapCategoryToKind(event.category);
     let directorName = '';
-
-    if (kind === 'film' || kind === 'movie') {
-        directorName = await fetchDirector(event.title);
-    }
+    if (kind === 'film' || kind === 'movie') directorName = await fetchDirector(event.title);
 
     setPreFillData({
         title: event.title,
@@ -137,9 +118,7 @@ export default function PublicEventDetail({ session }) {
         if (error) throw error;
         setShowEntryForm(false);
         navigate('/history'); 
-    } catch (error) {
-        alert(`Supabase Error: ${error.message}`);
-    }
+    } catch (error) { alert(`Supabase Error: ${error.message}`); }
   };
 
   if (loading) return <div className="p-12 text-center text-gray-400">Loading...</div>;
@@ -154,8 +133,6 @@ export default function PublicEventDetail({ session }) {
     <div className="min-h-screen py-12 px-4 animate-fade-in relative">
       <div className="max-w-3xl mx-auto mb-6 flex justify-between items-center">
         <button onClick={() => navigate(-1)} className="text-sm font-bold text-gray-400 hover:text-black">← Back</button>
-        
-        {/* UPDATED BUTTON TEXT */}
         <button onClick={handleLogClick} disabled={isPreparingLog} className="bg-black text-white font-bold text-xs px-4 py-2 rounded-lg hover:bg-gray-800 transition-transform active:scale-95 shadow-sm flex items-center gap-2 disabled:opacity-70 disabled:cursor-wait">
             {isPreparingLog ? <><Loader2 className="w-3 h-3 animate-spin" /> Fetching info...</> : <><Plus className="w-3 h-3" /> Tab</>}
         </button>
@@ -208,10 +185,16 @@ export default function PublicEventDetail({ session }) {
         </div>
       </article>
 
+      {/* FULL SCREEN MOBILE MODAL */}
       {showEntryForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl relative">
-                <button onClick={() => setShowEntryForm(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"><Plus className="w-5 h-5 transform rotate-45 text-gray-500" /></button>
+        <div className="fixed inset-0 z-[100] bg-white sm:bg-black/60 sm:backdrop-blur-sm flex items-start justify-center overflow-y-auto animate-fade-in">
+            <div className="w-full min-h-screen bg-white sm:min-h-0 sm:mt-10 sm:max-w-2xl sm:rounded-2xl sm:shadow-2xl relative">
+                <button onClick={() => setShowEntryForm(false)} className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-50 sm:hidden">
+                    <X className="w-5 h-5 text-gray-900" />
+                </button>
+                <button onClick={() => setShowEntryForm(false)} className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10 hidden sm:block">
+                    <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
+                </button>
                 <EntryForm initialData={preFillData} onAddEntry={handleAddEntry} onCancel={() => setShowEntryForm(false)} />
             </div>
         </div>

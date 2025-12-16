@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from 'react'; // Added useRef
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import UnifiedFeed from '../components/UnifiedFeed'; 
 import EntryForm from '../components/EntryForm'; 
-import { Plus } from 'lucide-react'; 
+import { Plus, X } from 'lucide-react'; // Added X for close button
 import { useNavigate } from 'react-router-dom';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -34,21 +34,14 @@ function mapCategoryToKind(cat) {
 export default function Dashboard({ session: propSession, logTrigger }) {
   const [session, setSession] = useState(propSession);
   const [profile, setProfile] = useState(null);
-  
-  // MODAL STATES
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState(null); 
   const [preFillData, setPreFillData] = useState(null); 
-
   const [feedKey, setFeedKey] = useState(0); 
   const navigate = useNavigate();
-
-  // FIX: Track the previous trigger value so we don't open on mount
   const prevLogTrigger = useRef(logTrigger);
 
-  // LISTEN FOR HEADER CLICK (From Layout)
   useEffect(() => {
-    // Only open if the trigger has INCREASED since the last render
     if (logTrigger > prevLogTrigger.current) {
       handleOpenNew();
       prevLogTrigger.current = logTrigger;
@@ -56,19 +49,12 @@ export default function Dashboard({ session: propSession, logTrigger }) {
   }, [logTrigger]);
 
   useEffect(() => {
-    if (propSession?.user) {
-        setSession(propSession);
-    } else {
-        supabase.auth.getSession().then(({ data }) => {
-            if (data?.session) setSession(data.session);
-        });
-    }
+    if (propSession?.user) setSession(propSession);
+    else supabase.auth.getSession().then(({ data }) => { if (data?.session) setSession(data.session); });
   }, [propSession]);
 
   useEffect(() => {
-    if (session?.user) {
-        getProfile(session.user.id);
-    }
+    if (session?.user) getProfile(session.user.id);
   }, [session]);
 
   const getProfile = async (userId) => {
@@ -85,10 +71,7 @@ export default function Dashboard({ session: propSession, logTrigger }) {
   const handleLogPublicEvent = async (item) => {
     const kind = mapCategoryToKind(item.category);
     let directorName = '';
-
-    if (kind === 'film' || kind === 'movie') {
-        directorName = await fetchDirector(item.title);
-    }
+    if (kind === 'film' || kind === 'movie') directorName = await fetchDirector(item.title);
 
     setPreFillData({
         title: item.title,
@@ -140,8 +123,6 @@ export default function Dashboard({ session: propSession, logTrigger }) {
 
   return (
     <div className="animate-fade-in relative">
-      
-      {/* 1. WELCOME SECTION */}
       <div className="pt-8 pb-6 px-4">
          <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">
             Welcome back, {profile?.username || 'there'}.
@@ -152,7 +133,6 @@ export default function Dashboard({ session: propSession, logTrigger }) {
          <div className="h-px bg-gray-100 w-full mt-8 mb-8"></div>
       </div>
 
-      {/* 2. FEED */}
       <div className="px-4">
          <UnifiedFeed 
             key={feedKey} 
@@ -162,13 +142,23 @@ export default function Dashboard({ session: propSession, logTrigger }) {
          /> 
       </div>
 
-      {/* 3. MODAL */}
+      {/* FULL SCREEN MOBILE MODAL */}
       {showEntryForm && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="w-full h-[85vh] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl relative">
+        <div className="fixed inset-0 z-[100] bg-white sm:bg-black/60 sm:backdrop-blur-sm flex items-start justify-center overflow-y-auto animate-fade-in">
+            <div className="w-full min-h-screen bg-white sm:min-h-0 sm:mt-10 sm:max-w-2xl sm:rounded-2xl sm:shadow-2xl relative">
+                
+                {/* Close Button (Visible on Mobile Top-Right) */}
                 <button 
                   onClick={closeModal}
-                  className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10"
+                  className="absolute top-6 right-6 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-50 sm:hidden"
+                >
+                  <X className="w-5 h-5 text-gray-900" />
+                </button>
+
+                {/* Close Button (Desktop Style) */}
+                <button 
+                  onClick={closeModal}
+                  className="absolute top-4 right-4 p-2 bg-gray-100 rounded-full hover:bg-gray-200 z-10 hidden sm:block"
                 >
                   <Plus className="w-5 h-5 transform rotate-45 text-gray-500" />
                 </button>
@@ -183,7 +173,6 @@ export default function Dashboard({ session: propSession, logTrigger }) {
             </div>
         </div>
       )}
-
     </div>
   );
 }
