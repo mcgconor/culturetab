@@ -1,186 +1,189 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import * as cheerio from 'cheerio';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fetch from 'node-fetch'; 
-import { normaliseVenue } from './venueNormaliser.js'; 
+import https from 'https';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootPath = path.resolve(__dirname, '../');
-dotenv.config({ path: path.join(rootPath, '.env') });
+dotenv.config();
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const TMDB_API_KEY = process.env.VITE_TMDB_API_KEY;
+const SCHEDULE_URL = 'https://ifi.ie/weekly-schedule/';
 
-const TMDB_API_KEY = process.env.VITE_TMDB_API_KEY; 
-const IFI_BASE_URL = 'https://ifi.ie';
-const SCRAPER_NAME = 'IFI_Bot_v1';
+const client = axios.create({
+    timeout: 15000,
+    httpsAgent: new https.Agent({ keepAlive: true }),
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+});
+
+// --- HELPERS ---
+
+function cleanTitle(rawTitle) {
+    let title = rawTitle;
+
+    // 1. Remove leading junk (e.g., "50 ", "00 ", "15.40 ")
+    // Matches digits followed by space/dot/dash at start
+    title = title.replace(/^[\d\s.:-]+/, '');
+
+    // 2. Remove Technical/Accessibility Tags (e.g., (35mm), (OC), (Digital))
+    title = title.replace(/\s*\((?:Digital|35mm|70mm|4k|OC|AD|ISL|CC|Open Captioned)\)/gi, '');
+
+    // 3. Remove IFI Brand Prefixes
+    // "Wild Strawberries: Batman" -> "Batman"
+    // "Preview: Saipan" -> "Saipan"
+    title = title.replace(/^(Preview|Irish Focus|Wild Strawberries|Mystery Matinee|Archive at Lunchtime):\s*/i, '');
+
+    // 4. Remove "+ Q&A" suffixes
+    title = title.replace(/\s*\+\s*Q&A.*/i, '');
+
+    return title.trim();
+}
 
 async function fetchTMDBData(title) {
-    if (!TMDB_API_KEY) return null;
+    if (!TMDB_API_KEY || !title) return null;
     try {
-        const cleanTitle = title.split('(')[0].trim();
-        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanTitle)}`;
-        const res = await fetch(searchUrl);
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-            const movie = data.results[0]; 
-            return {
-                image_url: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : null,
-                description: movie.overview
-            };
-        }
-    } catch (err) {}
-    return null;
-}
+        // Search
+        const searchRes = await axios.get(`https://api.themoviedb.org/3/search/movie`, {
+            params: { api_key: TMDB_API_KEY, query: title }
+        });
+        const movie = searchRes.data.results?.[0];
+        
+        if (!movie) return null;
 
-function parseDayString(dayString) {
-    const parts = dayString.split(' ');
-    const day = parseInt(parts[2].replace(/\D/g, ''), 10); 
-    const month = parts[1];
-    
-    let year = new Date().getFullYear();
-    const currentMonthIndex = new Date().getMonth();
-    const monthIndex = new Date(Date.parse(month + " 1, " + year)).getMonth();
+        // Details
+        const creditsRes = await axios.get(`https://api.themoviedb.org/3/movie/${movie.id}/credits`, {
+            params: { api_key: TMDB_API_KEY }
+        });
+        const director = creditsRes.data.crew?.find(p => p.job === 'Director')?.name;
 
-    if (monthIndex < currentMonthIndex && currentMonthIndex > 9) {
-        year++;
+        return {
+            image_url: movie.poster_path ? `https://image.tmdb.org/t/p/original${movie.poster_path}` : null,
+            description: movie.overview,
+            director: director,
+            tmdb_rating: movie.vote_average
+        };
+    } catch (e) {
+        return null;
     }
-    
-    return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
+
+// --- MAIN SCRAPER ---
 
 async function scrapeIFI() {
-  console.log(`🎬 Starting ${SCRAPER_NAME}...`);
-  const startTime = Date.now();
-  
-  let logId = null;
-  const { data: logData, error: logError } = await supabase
-    .from('scraper_logs')
-    .insert([{ scraper_name: SCRAPER_NAME, status: 'running', items_fetched: 0 }])
-    .select()
-    .single();
+  console.log('🎬 Starting IFI Sync (Smart Cleaner)...');
 
-  if (!logError) logId = logData.id;
-
-  const IFI_CANONICAL_VENUE = normaliseVenue("Irish Film Institute (IFI)"); 
-  
   try {
-    const response = await fetch(`${IFI_BASE_URL}/weekly-schedule`);
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    let currentDayDateStr = null;
-    const screenings = [];
-    const titlesToEnrich = new Set(); 
-    const dateRegex = /(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)/i;
-
-    $('.btmblock.clearfix *').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text.length === 0) return;
-
-        if (text.includes('DAY') && dateRegex.test(text)) {
-            currentDayDateStr = parseDayString(text);
-            return;
-        }
-
-        if (currentDayDateStr && text.includes('–')) {
-            const parts = text.split('–', 2).map(s => s.trim());
-            const rawTitle = parts[0];
-            const rawTimes = parts[1];
-            if (!rawTimes || !rawTimes.match(/\d{2}\.\d{2}/)) return;
-
-            const title = rawTitle.split('(')[0].trim();
-            const timesList = rawTimes.split(',');
-            titlesToEnrich.add(title);
-            
-            timesList.forEach(timeNote => {
-                const timeMatch = timeNote.match(/(\d{2}\.\d{2})/);
-                if (!timeMatch) return;
-                
-                const time = timeMatch[0].replace('.', ':'); 
-                const fullDateTime = `${currentDayDateStr}T${time}:00`;
-
-                // Create a unique hash for ID: "Title + Date" in Base64
-                // This ensures if IFI updates the schedule, we know it's the same screening
-                const uniqueString = `${title}_${fullDateTime}_IFI`;
-                const externalId = Buffer.from(uniqueString).toString('base64');
-
-                let external_url = `${IFI_BASE_URL}/weekly-schedule`; // Default
-
-                screenings.push({
-                    external_id: externalId, // ROBUST ID
-                    title: title,
-                    start_date: fullDateTime,
-                    venue: IFI_CANONICAL_VENUE, 
-                    category: 'film',
-                    scraper_source: SCRAPER_NAME,
-                    external_url: external_url,
-                    source: 'ifi', // Explicit source
-                    image_url: null, 
-                    description: null 
-                });
-            });
-        }
-    });
-
-    console.log(`\n🍿 Querying TMDB for ${titlesToEnrich.size} unique titles...`);
+    const { data } = await client.get(SCHEDULE_URL);
+    const $ = cheerio.load(data);
     
-    const enrichmentMap = {};
-    for (const title of titlesToEnrich) {
-        const tmdbData = await fetchTMDBData(title);
-        if (tmdbData) enrichmentMap[title] = tmdbData;
-        await new Promise(r => setTimeout(r, 100)); 
+    $('script, style, nav, footer, header').remove();
+    const rawText = $('body').text().replace(/\s+/g, ' ').trim();
+    
+    // Split by Day
+    const daySplitRegex = /(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)\s+([A-Z]+)\s+(\d{1,2}(?:ST|ND|RD|TH)?)/gi;
+    let chunks = [];
+    let match;
+    while ((match = daySplitRegex.exec(rawText)) !== null) {
+        chunks.push({ header: match[0], index: match.index, dateStr: match[0] });
     }
-    
-    const finalScreenings = screenings.map(s => {
-        const extra = enrichmentMap[s.title];
+
+    console.log(`   📅 Found ${chunks.length} day headers.`);
+    let rawScreenings = [];
+
+    // Process Chunks
+    for (let i = 0; i < chunks.length; i++) {
+        const currentChunk = chunks[i];
+        const startText = currentChunk.index + currentChunk.header.length;
+        const endText = (i + 1 < chunks.length) ? chunks[i+1].index : rawText.length;
+        const dayContent = rawText.substring(startText, endText);
+
+        // Parse Date
+        const cleanDate = currentChunk.dateStr.replace(/(st|nd|rd|th)/gi, '').trim(); 
+        const dateParts = cleanDate.split(' '); 
+        if (dateParts.length < 3) continue;
+
+        const year = new Date().getFullYear();
+        let dateObj = new Date(`${dateParts[1]} ${dateParts[2]} ${year}`);
+        if (dateObj < new Date() && dateObj.getMonth() < 3) dateObj.setFullYear(year + 1);
+
+        // Find Movies
+        const timeRegex = /[-–]\s*(\d{1,2})[.:](\d{2})/g;
+        let timeMatch;
+        let lastMatchIndex = 0;
+
+        while ((timeMatch = timeRegex.exec(dayContent)) !== null) {
+            // Extract raw title text
+            const textBefore = dayContent.substring(lastMatchIndex, timeMatch.index).trim();
+            // Split by common delimiters to separate from previous entry
+            const segments = textBefore.split(/[.●]/); 
+            let rawTitle = segments[segments.length - 1].trim(); 
+            
+            // CLEAN TITLE HERE
+            let title = cleanTitle(rawTitle);
+
+            if (title.length > 2 && !title.match(/Schedule|IFI|Open/i)) {
+                const h = parseInt(timeMatch[1]);
+                const m = parseInt(timeMatch[2]);
+                const start = new Date(dateObj);
+                start.setHours(h, m, 0);
+
+                rawScreenings.push({
+                    title: title, // Clean title for TMDB
+                    original_title: rawTitle, // Keep raw just in case
+                    start_date: start,
+                    original_id: `#ifi-${start.getTime()}-${title.substring(0,5).replace(/\s/g,'')}`
+                });
+            }
+            lastMatchIndex = timeMatch.index + timeMatch[0].length;
+        }
+    }
+
+    // Enrich with TMDB
+    console.log(`   🍿 Found ${rawScreenings.length} screenings. Fetching metadata...`);
+    const uniqueTitles = [...new Set(rawScreenings.map(s => s.title))];
+    const movieCache = {};
+
+    for (const title of uniqueTitles) {
+        if (title.includes("Programme") || title.includes("Shorts")) continue;
+        const metadata = await fetchTMDBData(title);
+        if (metadata) {
+            movieCache[title] = metadata;
+            console.log(`      ✨ Enriched: "${title}"`);
+        } else {
+            console.log(`      ⚠️ No TMDB match: "${title}"`);
+        }
+    }
+
+    // Merge & Save
+    const finalEvents = rawScreenings.map(s => {
+        const meta = movieCache[s.title] || {};
+        
         return {
-            ...s,
-            image_url: extra?.image_url || s.image_url, 
-            description: extra?.description || `Screening at IFI: ${s.title}`,
+            title: s.title, // Use cleaned title
+            start_date: s.start_date.toISOString(),
+            venue: 'Irish Film Institute',
+            // Format description nicely
+            description: meta.director ? `Director: ${meta.director}\n\n${meta.description || ''}` : (meta.description || 'Check IFI website for details.'),
+            image_url: meta.image_url || '',
+            external_url: 'https://ifi.ie/weekly-schedule' + s.original_id,
+            category: 'Film',
+            source: 'ifi',
+            scraper_source: 'syncIFI.js'
         };
     });
 
-    console.log(`✅ Found ${finalScreenings.length} screenings. Syncing...`);
-
-    let newCount = 0;
-    for (const event of finalScreenings) {
-        // ROBUST DEDUPE CHECK
-        const { data: existing } = await supabase
-            .from('public_events')
-            .select('id')
-            .eq('external_id', event.external_id)
-            .single();
-
-        if (!existing) {
-            const { error: insertError } = await supabase
-                .from('public_events')
-                .insert([event]);
-            
-            if (!insertError) newCount++;
-        }
+    if (finalEvents.length > 0) {
+        const uniqueEvents = Array.from(new Map(finalEvents.map(item => [item.external_url, item])).values());
+        const { error } = await supabase.from('public_events').upsert(uniqueEvents, { onConflict: 'external_url' });
+        
+        if (error) console.error(`❌ DB Error: ${error.message}`);
+        else console.log(`✅ Synced ${uniqueEvents.length} IFI screenings.`);
     }
 
-    console.log(`🚀 Success! Added ${newCount} new IFI screenings.`);
-
-    if (logId) {
-        await supabase.from('scraper_logs').update({ 
-          status: 'success', 
-          items_fetched: newCount,
-          duration_seconds: Math.round((Date.now() - startTime) / 1000)
-        }).eq('id', logId);
-    }
-
-  } catch (err) {
-    console.error('❌ Scrape failed:', err);
-    if (logId) {
-        await supabase.from('scraper_logs').update({ status: 'error', error_message: err.message }).eq('id', logId);
-    }
+  } catch (e) {
+      console.error(`❌ Error: ${e.message}`);
   }
 }
 

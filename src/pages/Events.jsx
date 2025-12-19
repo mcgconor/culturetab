@@ -107,14 +107,27 @@ export default function Events({ session, logTrigger }) {
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">Upcoming Events</h1>
         <p className="text-lg text-gray-500 max-w-xl leading-relaxed mb-6">See what's happening around Dublin.</p>
         <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-xl py-2 -mx-4 px-4 border-b border-gray-50 mb-6 transition-all">
-            <Filters filters={filters} setFilters={setFilters} showRating={false} />
+            <Filters filters={filters} setFilters={setFilters} showRating={false} resultCount={filteredEvents.length} />
         </div>
       </div>
 
       <div className="px-4">
-        {loading ? <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>)}</div> :
-         filteredEvents.length === 0 ? <div className="text-center py-20 text-gray-400">No events found matching your filters.</div> :
-         <div className="space-y-4">{filteredEvents.map(item => <UniversalCard key={item.id} item={item} type="public" onAction={handleLogThis} />)}</div>}
+        {loading ? (
+            <div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>)}</div>
+        ) : filteredEvents.length === 0 ? (
+            /* === UNIFIED EMPTY STATE === */
+            <div className="text-center py-20 bg-gray-50 rounded-2xl border border-gray-100">
+                <p className="text-gray-500 font-medium">No events found matching your filters.</p>
+                <button 
+                    onClick={() => setFilters({ search: '', kind: 'all', date: '', rating: 'all' })}
+                    className="mt-4 text-black font-bold underline text-sm hover:text-gray-700"
+                >
+                    Clear Filters
+                </button>
+            </div>
+        ) : (
+            <div className="space-y-4">{filteredEvents.map(item => <UniversalCard key={item.id} item={item} type="public" onAction={handleLogThis} />)}</div>
+        )}
       </div>
 
       {/* FULL SCREEN MODAL */}

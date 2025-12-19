@@ -78,7 +78,12 @@ export default function History({ session: propSession, logTrigger }) {
         <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-2">Your History</h1>
         <p className="text-lg text-gray-500 max-w-xl leading-relaxed mb-6">A collection of everything you've watched, read, and attended.</p>
         <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-xl py-2 -mx-4 px-4 border-b border-gray-50 mb-6 transition-all">
-            <Filters filters={filters} setFilters={setFilters} showRating={true} />
+            <Filters 
+                filters={filters} 
+                setFilters={setFilters} 
+                showRating={true} 
+                resultCount={filteredEntries.length} 
+            />
         </div>
       </div>
 

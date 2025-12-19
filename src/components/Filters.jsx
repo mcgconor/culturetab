@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Calendar, Star, X } from 'lucide-react';
 
-export default function Filters({ filters, setFilters, showRating = false }) {
+export default function Filters({ filters, setFilters, showRating = false, resultCount = 0 }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const categories = [
@@ -13,7 +13,6 @@ export default function Filters({ filters, setFilters, showRating = false }) {
     { id: 'exhibition', label: 'Art' },
   ];
 
-  // Helper to update a specific filter key
   const handleChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -35,7 +34,7 @@ export default function Filters({ filters, setFilters, showRating = false }) {
       {/* ROW 1: SEARCH + CATEGORY LOZENGES */}
       <div className="flex items-center gap-4">
         
-        {/* EXPANDING SEARCH */}
+        {/* EXPANDING SEARCH (Original Logic) */}
         <div className={`relative transition-all duration-300 ${isSearchOpen ? 'w-full md:w-64' : 'w-10'}`}>
           <div 
             className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center cursor-pointer z-10"
@@ -56,7 +55,7 @@ export default function Filters({ filters, setFilters, showRating = false }) {
           />
         </div>
 
-        {/* CATEGORY LOZENGES (Scrollable) */}
+        {/* CATEGORY LOZENGES */}
         <div className="flex-1 overflow-x-auto no-scrollbar mask-gradient-right">
           <div className="flex gap-2">
             {categories.map((cat) => {
@@ -81,46 +80,54 @@ export default function Filters({ filters, setFilters, showRating = false }) {
         </div>
       </div>
 
-      {/* ROW 2: SECONDARY FILTERS (Date / Rating) */}
-      <div className="flex flex-wrap items-center gap-3 pl-1">
+      {/* ROW 2: FILTERS & RESULT COUNT */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pl-1">
         
-        {/* DATE PICKER */}
-        <div className="relative group">
-           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-black transition-colors" />
-           <input 
-             type="date" 
-             value={filters.date || ''}
-             onChange={(e) => handleChange('date', e.target.value)}
-             className="pl-9 pr-3 h-9 bg-white border border-gray-200 rounded-lg text-xs font-bold uppercase text-gray-600 outline-none focus:border-black transition-colors cursor-pointer"
-           />
+        {/* LEFT: Inputs */}
+        <div className="flex flex-wrap items-center gap-3">
+            {/* DATE PICKER */}
+            <div className="relative group">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-black transition-colors" />
+                <input 
+                    type="date" 
+                    value={filters.date || ''}
+                    onChange={(e) => handleChange('date', e.target.value)}
+                    className="pl-9 pr-3 h-9 bg-white border border-gray-200 rounded-lg text-xs font-bold uppercase text-gray-600 outline-none focus:border-black transition-colors cursor-pointer"
+                />
+            </div>
+
+            {/* RATING */}
+            {showRating && (
+                <div className="relative group">
+                    <Star className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-yellow-500 transition-colors" />
+                    <select 
+                    value={filters.rating} 
+                    onChange={(e) => handleChange('rating', e.target.value)}
+                    className="pl-9 pr-8 h-9 bg-white border border-gray-200 rounded-lg text-xs font-bold uppercase text-gray-600 outline-none focus:border-black transition-colors appearance-none cursor-pointer"
+                    >
+                    <option value="all">Any Rating</option>
+                    <option value="5">5 Stars Only</option>
+                    <option value="4">4+ Stars</option>
+                    <option value="3">3+ Stars</option>
+                    </select>
+                </div>
+            )}
+
+            {/* CLEAR BUTTON */}
+            {hasActiveFilters && (
+                <button 
+                    onClick={clearFilters}
+                    className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
+                >
+                    <X className="w-3 h-3" /> Clear
+                </button>
+            )}
         </div>
 
-        {/* RATING FILTER (Conditionally Rendered) */}
-        {showRating && (
-           <div className="relative group">
-             <Star className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-yellow-500 transition-colors" />
-             <select 
-               value={filters.rating} 
-               onChange={(e) => handleChange('rating', e.target.value)}
-               className="pl-9 pr-8 h-9 bg-white border border-gray-200 rounded-lg text-xs font-bold uppercase text-gray-600 outline-none focus:border-black transition-colors appearance-none cursor-pointer"
-             >
-               <option value="all">Any Rating</option>
-               <option value="5">5 Stars Only</option>
-               <option value="4">4+ Stars</option>
-               <option value="3">3+ Stars</option>
-             </select>
-           </div>
-        )}
-
-        {/* CLEAR FILTERS BUTTON */}
-        {hasActiveFilters && (
-            <button 
-                onClick={clearFilters}
-                className="ml-auto text-xs font-bold text-red-500 hover:text-red-700 flex items-center gap-1"
-            >
-                <X className="w-3 h-3" /> Clear
-            </button>
-        )}
+        {/* RIGHT: RESULTS COUNTER (Added) */}
+        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            {resultCount} {resultCount === 1 ? 'Result' : 'Results'}
+        </div>
 
       </div>
     </div>

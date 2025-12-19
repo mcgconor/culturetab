@@ -43,3 +43,56 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+
+name: Daily Event Sync
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # Runs at 4am UTC every day
+  workflow_dispatch: # Allows you to click "Run Now" manually in GitHub
+
+jobs:
+  sync-events:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      # 1. Ticketmaster Sync
+      - name: Sync Ticketmaster
+        run: node scrapers/syncTicketmaster.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TICKETMASTER_KEY: ${{ secrets.VITE_TICKETMASTER_KEY }}
+
+      # 2. IFI Cinema Sync (Updated with TMDB Key)
+      - name: Sync IFI Cinema
+        run: node scrapers/syncIFI.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+
+      # 3. Journal of Music Sync
+      - name: Sync Journal of Music
+        run: node scrapers/syncJournal.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
+
+      # 4. Abbey Theatre Sync (NEW)
+      - name: Sync Abbey Theatre
+        run: node scrapers/syncAbbey.js
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
