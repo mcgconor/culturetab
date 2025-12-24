@@ -2,8 +2,8 @@ name: Daily Event Sync
 
 on:
   schedule:
-    - cron: "0 4 * * *" # Runs at 4am UTC every day
-  workflow_dispatch: # Allows you to click "Run Now" manually in GitHub
+    - cron: "0 4 * * *" # Runs at 4am UTC
+  workflow_dispatch: # Allows manual trigger
 
 jobs:
   sync-events:
@@ -19,19 +19,17 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install Dependencies
+      - name: Install Dependencies (NPM)
         run: npm ci
 
-      # --- PUPPETEER SETUP (Critical for Abbey & Dublin.ie) ---
-      - name: Install Linux Browser Deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 lsb-release wget xdg-utils
+      # --- FIXED STEP: Install System Libraries ---
+      # We use the official Puppeteer utility to install only what is needed.
+      - name: Install Puppeteer System Deps
+        run: sudo npx puppeteer browsers install-deps
 
-      # --- RUN SCRAPERS INDEPENDENTLY ---
-      # If one fails, we use 'continue-on-error' so the others still run.
+      # --- RUN SCRAPERS ---
 
-      # 1. Abbey Theatre (Uses Puppeteer)
+      # 1. Abbey Theatre
       - name: Sync Abbey Theatre
         continue-on-error: true
         run: node scrapers/syncAbbey.js
@@ -39,7 +37,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
 
-      # 2. IFI Cinema (Standard Axios)
+      # 2. IFI Cinema
       - name: Sync IFI Cinema
         continue-on-error: true
         run: node scrapers/syncIFI.js
@@ -48,7 +46,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
-      # 3. Journal of Music (Standard Axios)
+      # 3. Journal of Music
       - name: Sync Journal of Music
         continue-on-error: true
         run: node scrapers/syncJournal.js
@@ -56,7 +54,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
 
-      # 4. Dublin.ie (Uses Puppeteer)
+      # 4. Dublin.ie
       - name: Sync Dublin.ie
         continue-on-error: true
         run: node scrapers/syncDublinIE.js
@@ -64,7 +62,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
 
-      # 5. Ticketmaster (Standard Axios)
+      # 5. Ticketmaster
       - name: Sync Ticketmaster
         continue-on-error: true
         run: node scrapers/syncTicketmaster.js
