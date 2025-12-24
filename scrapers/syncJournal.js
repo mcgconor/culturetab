@@ -16,17 +16,26 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const SCRAPER_NAME = 'Journal_of_Music_Bot_v12_TitleFix';
+const SCRAPER_NAME = 'syncJournal.js'; // Updated to match Admin Dashboard expectations
+
+// 🛑 1. IGNORED VENUES (Let specific scrapers handle these)
+const IGNORED_VENUES = [
+  'Abbey Theatre', 
+  'Irish Film Institute', 
+  'IFI',
+  'National Concert Hall', 
+  'NCH',
+  'Bord Gáis Energy Theatre'
+];
 
 const DUBLIN_LOCATIONS = [
   'Dublin', 'Dún Laoghaire', 'Dun Laoghaire', 'Belfield', 'Blackrock', 
   'Tallaght', 'Rathmines', 'Smithfield', 'Temple Bar', 'Phibsborough',
-  'National Concert Hall', 'NCH', "Whelan's", 'Vicar Street', 
-  'The Sugar Club', 'Button Factory', 'Workman\'s Club', 'Grand Social',
+  "Whelan's", 'Vicar Street', 'The Sugar Club', 'Button Factory', 'Workman\'s Club', 'Grand Social',
   'Academy', '3Arena', 'Bord Gáis', 'Smock Alley', 'Project Arts Centre',
   'Complex', 'Unitarian Church', 'Pepper Canister', 'Helix', 'Pavilion Theatre',
   'Draíocht', 'Civic Theatre', 'Axis', 'Classon', 'Kevin Barry Room', 
-  'Studio', 'Main Stage', 'Abbey Theatre', 'Gate Theatre', 'Gaiety', 'Olympia',
+  'Studio', 'Main Stage', 'Gate Theatre', 'Gaiety', 'Olympia',
   'RIAM', 'Royal Irish Academy of Music', 'Whyte Hall', 'Hugh Lane', 'Chester Beatty',
   'IMMA', 'RHA', 'Science Gallery', 'MoLI', 'Croke Park', 'Aviva'
 ];
@@ -55,9 +64,36 @@ async function uploadImageToSupabase(originalUrl, eventTitle) {
     } catch (err) { return null; }
 }
 
+// --- HELPER: Check for Cross-Scraper Duplicates ---
+async function isDuplicate(title, dateStr, venue) {
+    if (!dateStr) return false;
+    
+    // Check 1: Is this a venue we ignore?
+    if (IGNORED_VENUES.some(v => venue?.toLowerCase().includes(v.toLowerCase()))) return true;
+
+    // Check 2: Database Check
+    const startDate = new Date(dateStr);
+    const dayStart = startDate.toISOString().split('T')[0] + 'T00:00:00';
+    const dayEnd = startDate.toISOString().split('T')[0] + 'T23:59:59';
+
+    const { data: existing } = await supabase
+        .from('public_events')
+        .select('title')
+        .gte('start_date', dayStart)
+        .lte('start_date', dayEnd);
+
+    if (!existing || existing.length === 0) return false;
+
+    // Fuzzy Title Match
+    const cleanNew = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return existing.some(e => {
+        const cleanDb = e.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return cleanDb.includes(cleanNew) || cleanNew.includes(cleanDb);
+    });
+}
+
 async function scrapeDeep() {
-  console.log(`🗞️  Starting ${SCRAPER_NAME}...`);
-  const startTime = Date.now();
+  console.log(`🗞️  Starting Journal of Music Sync...`);
   
   const baseUrl = 'https://journalofmusic.com/listings/events';
   const eventLinks = [];
@@ -75,6 +111,12 @@ async function scrapeDeep() {
 
         $('.view-content .views-row').each((_, el) => {
           const venueText = $(el).find('.views-field-field-venue .field-content').text().trim();
+          
+          // 🛑 GUARD: Skip ignored venues immediately
+          if (IGNORED_VENUES.some(v => venueText.toLowerCase().includes(v.toLowerCase()))) {
+             return; 
+          }
+
           const title = $(el).find('.views-field-title a').text().trim();
           const relativeLink = $(el).find('.views-field-title a').attr('href');
           
@@ -95,7 +137,7 @@ async function scrapeDeep() {
       } catch (e) { console.error(`List error: ${e.message}`); }
     }
 
-    console.log(`\n🔍 Found ${eventLinks.length} Dublin events. Visiting details...`);
+    console.log(`\n🔍 Found ${eventLinks.length} Dublin events (excluding blocked venues). Visiting details...`);
     const enrichedEvents = [];
 
     // 2. VISIT DETAILS
@@ -105,38 +147,30 @@ async function scrapeDeep() {
         const html = await res.text();
         const $ = cheerio.load(html);
 
-        // --- FIX: TITLE LOGIC ---
-        // 1. Try Meta Tag (Cleanest)
-        let fullTitle = $('meta[property="og:title"]').attr('content');
+        let fullTitle = $('meta[property="og:title"]').attr('content') || $('h1#page-title').text().trim() || link.title;
 
-        // 2. Try Specific Page Title ID
-        if (!fullTitle) fullTitle = $('h1#page-title').text().trim();
-
-        // 3. Fallback to List Title
-        if (!fullTitle) fullTitle = link.title;
-
-        // SAFETY: If we accidentally grabbed the Site Name, revert to list title
         if (fullTitle && fullTitle.includes('The Journal of Music') && fullTitle.includes('News, Reviews')) {
-            console.log(`   ⚠️ Bad title detected ("${fullTitle}"), reverting to list title.`);
             fullTitle = link.title;
         }
 
-        // --- DESCRIPTION ---
-        let description = 
-            $('.field-name-body .field-item').text().trim() || 
-            $('.field-name-body').text().trim() || 
-            $('.node-content p').first().text().trim();
+        let description = $('.field-name-body .field-item').text().trim() || 
+                          $('.field-name-body').text().trim() || 
+                          $('.node-content p').first().text().trim();
 
         if (description.length > 800) description = description.substring(0, 800) + '...';
 
         const dateAttr = $('.date-display-single').attr('content') || $('.date-display-start').attr('content');
         const isoDate = dateAttr ? new Date(dateAttr).toISOString() : new Date().toISOString();
 
-        // --- IMAGES ---
-        let rawImage = $('meta[property="og:image"]').attr('content');
-        if (!rawImage) rawImage = $('.field-name-field-image img').attr('src');
-        if (!rawImage) rawImage = link.listImage;
+        // 🛑 GUARD: Double check duplicate status (Title + Date + Venue)
+        // This stops us from adding an event that syncAbbey.js or syncIFI.js already added
+        if (await isDuplicate(fullTitle, isoDate, link.venue)) {
+            // console.log(`   🚫 Duplicate skipped: ${fullTitle}`);
+            continue;
+        }
 
+        // --- IMAGES ---
+        let rawImage = $('meta[property="og:image"]').attr('content') || $('.field-name-field-image img').attr('src') || link.listImage;
         if (rawImage && rawImage.startsWith('/')) rawImage = `https://journalofmusic.com${rawImage}`;
         if (rawImage && rawImage.includes('?')) rawImage = rawImage.split('?')[0];
 
@@ -173,21 +207,23 @@ async function scrapeDeep() {
           venue: normaliseVenue(link.venue),
           image_url: hostedImageUrl, 
           external_url: external_url, 
-          category: 'concert',
-          scraper_source: SCRAPER_NAME,
+          category: 'Music', // Normalised to 'Music' for the app
+          scraper_source: SCRAPER_NAME, // ✅ Matches Admin Dashboard
           source: 'journal_of_music' 
         });
 
+        // Small delay to be polite
         await new Promise(r => setTimeout(r, 100));
 
       } catch (err) { console.error(`   ❌ Failed: ${link.url}`); }
     }
 
     // 3. SYNC
-    console.log(`\n💾 Syncing ${enrichedEvents.length} events...`);
+    console.log(`\n💾 Syncing ${enrichedEvents.length} unique events...`);
     let newCount = 0;
     
     for (const event of enrichedEvents) {
+        // Upsert based on external_id (JOM-specific)
         const { data: existing } = await supabase
             .from('public_events')
             .select('id, title, description, image_url, external_url')
@@ -201,7 +237,7 @@ async function scrapeDeep() {
                 console.log(`   ✨ Added: ${event.title}`);
             }
         } else {
-            // FORCE UPDATE if we have better data
+            // FORCE UPDATE logic (Keep user's logic)
             const updates = {};
             
             // Fix Bad Titles (Site Name bug)
@@ -213,9 +249,8 @@ async function scrapeDeep() {
                 updates.title = event.title;
             }
 
-            if (event.description && !existing.description) updates.description = event.description;
-            if (event.image_url && !existing.image_url) updates.image_url = event.image_url;
-            if (event.external_url && !event.external_url.includes('journalofmusic')) updates.external_url = event.external_url;
+            // Ensure scraper_source is updated so it appears in Admin
+            updates.scraper_source = SCRAPER_NAME; 
 
             if (Object.keys(updates).length > 0) {
                 await supabase.from('public_events').update(updates).eq('id', existing.id);

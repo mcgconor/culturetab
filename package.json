@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync": "node scrapers/syncAbbey.js && node scrapers/syncIFI.js && node scrapers/syncDublinIE.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.3",
