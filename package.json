@@ -8,8 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "sync": "node scrapers/syncAbbey.js && node scrapers/syncIFI.js && node scrapers/syncDublinIE.js"
-  },
+    "sync": "node scrapers/syncAbbey.js && node scrapers/syncIFI.js && node scrapers/syncDublinIE.js && node scrapers/syncNCH.js"
+    },
   "dependencies": {
     "@supabase/supabase-js": "^2.87.3",
     "axios": "^1.13.2",
