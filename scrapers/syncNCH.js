@@ -23,7 +23,6 @@ function inferYear(dateString) {
     const now = new Date();
     const currentYear = now.getFullYear();
     let d = new Date(`${dateString} ${currentYear}`);
-    // If date has passed (e.g. looking at Jan while in Dec), it's next year
     if (d < now && d.getMonth() < now.getMonth()) {
         d = new Date(`${dateString} ${currentYear + 1}`);
     }
@@ -45,7 +44,6 @@ async function isDuplicate(title, dateStr) {
 
     if (!existing || existing.length === 0) return false;
 
-    // Fuzzy Title Match
     const cleanNew = title.toLowerCase().replace(/[^a-z0-9]/g, '');
     return existing.some(e => {
         const cleanDb = e.title.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -56,7 +54,7 @@ async function isDuplicate(title, dateStr) {
 // --- MAIN SCRAPER ---
 
 async function scrapeNCH() {
-  console.log('🎻 Starting National Concert Hall Sync (Recurring + Deep Scroll)...');
+  console.log('🎻 Starting National Concert Hall Sync (Aggressive Mode)...');
 
   const browser = await puppeteer.launch({
       headless: "new",
@@ -65,42 +63,53 @@ async function scrapeNCH() {
 
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1440, height: 900 });
+    // Set a very tall viewport to encourage loading
+    await page.setViewport({ width: 1440, height: 1200 });
 
     console.log(`   📄 Loading: ${START_URL}`);
-    await page.goto(START_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(START_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // Cookie Banner
+    // 1. COOKIE CRUSHER
     try {
         const cookieBtn = await page.waitForSelector('#onetrust-accept-btn-handler', { timeout: 4000 });
-        if (cookieBtn) await cookieBtn.click();
+        if (cookieBtn) {
+            await cookieBtn.click();
+            await new Promise(r => setTimeout(r, 1000));
+        }
     } catch(e) {}
 
-    // --- IMPROVED SCROLLING ---
-    console.log('   🖱️  Deep Scrolling (Fetching > 1 month data)...');
-    await page.evaluate(async () => {
-        await new Promise((resolve) => {
-            let totalHeight = 0;
-            const distance = 150;
-            const maxScrolls = 400; // Increased to scroll further down
-            let scrolls = 0;
-            
-            const timer = setInterval(() => {
-                const scrollHeight = document.body.scrollHeight;
-                window.scrollBy(0, distance);
-                totalHeight += distance;
-                scrolls++;
-                
-                // Stop if we hit bottom OR scrolled enough (approx 60,000px)
-                if(totalHeight >= scrollHeight || scrolls > maxScrolls){
-                    clearInterval(timer);
-                    resolve();
-                }
-            }, 50); // Faster scroll
+    // 2. AGGRESSIVE SCROLL & CLICK
+    console.log('   🖱️  Loading more events (Scrolling & Clicking)...');
+    
+    // We try to load more content 10 times
+    for (let i = 0; i < 10; i++) {
+        
+        // A. Scroll to bottom
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await new Promise(r => setTimeout(r, 2000)); // Wait for network
+        
+        // B. Look for "Load More" button and click it
+        // NCH selector often varies, we try a few common ones
+        const clicked = await page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button, a.btn'));
+            const loadMore = buttons.find(b => b.innerText.toLowerCase().includes('load more'));
+            if (loadMore) {
+                loadMore.click();
+                return true;
+            }
+            return false;
         });
-    });
 
-    // Extract Links
+        if (clicked) {
+            console.log(`      [${i+1}/10] Clicked "Load More"...`);
+            await new Promise(r => setTimeout(r, 3000)); // Wait longer for button load
+        } else {
+            process.stdout.write(`      [${i+1}/10] Scrolled... \r`);
+        }
+    }
+    console.log('\n   ✅ Finished loading.');
+
+    // 3. EXTRACT LINKS
     const links = await page.evaluate(() => {
         return Array.from(document.querySelectorAll('a'))
             .map(a => a.href)
@@ -113,10 +122,17 @@ async function scrapeNCH() {
 
     const uniqueLinks = [...new Set(links)];
     console.log(`   🔎 Found ${uniqueLinks.length} event links.`);
+    
+    // Save screenshot if still low count
+    if (uniqueLinks.length < 30) {
+        await page.screenshot({ path: 'debug-nch-scroll.png' });
+    }
+    
     await browser.close();
 
-    console.log(`   ⚡ Processing events (Checking for recurring dates)...`);
+    console.log(`   ⚡ Processing events...`);
 
+    // 4. PROCESS DETAILS
     for (const url of uniqueLinks) {
         try {
             const { data } = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -128,19 +144,14 @@ async function scrapeNCH() {
             const image = $('meta[property="og:image"]').attr('content');
             const description = $('meta[property="og:description"]').attr('content');
 
-            // --- DATE STRATEGY (Handling Multiple Dates) ---
             let startDates = [];
 
-            // 1. JSON-LD Check (Best for Recurring)
+            // A. JSON-LD Check
             $('script[type="application/ld+json"]').each((i, el) => {
                 try {
                     const json = JSON.parse($(el).html());
-                    
-                    // Case A: Single Event
                     if (json['@type'] === 'Event' || json['@type'] === 'MusicEvent') {
                         if (json.startDate) startDates.push(safeDate(json.startDate));
-                        
-                        // Case B: Recurring (subEvents)
                         if (json.subEvent && Array.isArray(json.subEvent)) {
                             json.subEvent.forEach(sub => {
                                 if (sub.startDate) startDates.push(safeDate(sub.startDate));
@@ -150,50 +161,43 @@ async function scrapeNCH() {
                 } catch(e) {}
             });
 
-            // 2. Text Scraper (Fallback if JSON-LD failed)
+            // B. Text Fallback
             if (startDates.length === 0) {
                 const bodyText = $('body').text();
-                // Matches "24 Oct 2025"
                 const fullDateMatch = bodyText.match(/(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i);
                 
                 if (fullDateMatch) {
                     startDates.push(safeDate(fullDateMatch[0].replace(/(st|nd|rd|th)/g, '')));
                 } else {
-                    // Try Short Date + Inference
                     const shortDateMatch = bodyText.match(/(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*)/i);
                     if (shortDateMatch) {
-                        const raw = shortDateMatch[0].replace(/(st|nd|rd|th)/g, '');
-                        startDates.push(inferYear(raw));
+                        startDates.push(inferYear(shortDateMatch[0].replace(/(st|nd|rd|th)/g, '')));
                     }
                 }
             }
 
-            // Remove invalid dates and duplicates
             startDates = startDates
                 .filter(d => d && !isNaN(d.getTime()))
-                .filter((date, index, self) => self.findIndex(d => d.getTime() === date.getTime()) === index); // Unique
+                .filter((date, index, self) => self.findIndex(d => d.getTime() === date.getTime()) === index);
 
             if (startDates.length === 0) {
-                console.log(`      ❌ Skipped "${title.substring(0,20)}...": No date found.`);
+                // console.log(`      ❌ Skipped "${title.substring(0,20)}...": No date found.`);
                 continue;
             }
 
-            // --- SAVE LOOP (One Entry Per Date) ---
             for (const startDate of startDates) {
-                
-                // Default Time Fix
                 if (startDate.getHours() === 0) startDate.setHours(19, 30);
 
-                // Skip if date is in the past (clean database)
-                if (startDate < new Date()) continue;
+                // Check Past Date
+                if (startDate < new Date()) {
+                    // console.log(`      ⚠️ Skipped "${title.substring(0,15)}...": Date in past (${startDate.toLocaleDateString()})`);
+                    continue;
+                }
 
-                // Create Unique URL for DB (Append Date Hash)
-                // e.g. https://nch.ie/event/concert#2025-05-20
                 const uniqueExternalUrl = `${url}#${startDate.toISOString()}`;
 
-                // DUPLICATE CHECK
                 if (await isDuplicate(title, startDate.toISOString())) {
-                    // console.log(`      🚫 Duplicate (Skipping): ${title} on ${startDate.toLocaleDateString()}`);
+                    // console.log(`      🚫 Duplicate: ${title}`);
                     continue;
                 }
 
@@ -203,7 +207,7 @@ async function scrapeNCH() {
                     venue: 'National Concert Hall',
                     description: description,
                     image_url: image || '',
-                    external_url: uniqueExternalUrl, // Uses the unique hashed URL
+                    external_url: uniqueExternalUrl,
                     category: 'Music',
                     source: 'nch',
                     scraper_source: 'syncNCH.js'

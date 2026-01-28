@@ -1,26 +1,50 @@
 import { useState, useEffect } from 'react';
 
+// Get Key
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY; 
 
 export default function MovieSearch({ initialTitle, onSelectMovie, onManualBypass }) {
   const [query, setQuery] = useState(initialTitle || '');
   const [suggestions, setSuggestions] = useState([]);
+  const [error, setError] = useState(null); // New Error State
 
   useEffect(() => {
     setQuery(initialTitle || '');
+    
+    // Debug Log on Mount
+    console.log("🎬 MovieSearch Component Mounted");
+    if (!TMDB_API_KEY) {
+        console.error("❌ CRITICAL: VITE_TMDB_API_KEY is missing! Search will not work.");
+        setError("Missing API Key");
+    } else {
+        console.log("✅ API Key detected (ends with):", TMDB_API_KEY.slice(-4));
+    }
   }, [initialTitle]);
 
   const fetchMovies = async (searchTerm) => {
-    if (searchTerm.length < 3 || !TMDB_API_KEY) {
+    // 1. Validation
+    if (!TMDB_API_KEY) return;
+    if (searchTerm.length < 3) {
       setSuggestions([]);
       return;
     }
+
+    console.log(`🔎 Searching TMDB for: "${searchTerm}"`);
+
     try {
       const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchTerm)}`);
+      
+      if (!res.ok) {
+          console.error("❌ TMDB API Error:", res.status, res.statusText);
+          return;
+      }
+
       const data = await res.json();
+      console.log(`   ✅ Found ${data.results?.length || 0} results.`);
       setSuggestions(data.results ? data.results.slice(0, 5) : []);
+      
     } catch (err) {
-      console.error(err);
+      console.error("❌ Network/Fetch Error:", err);
       setSuggestions([]);
     }
   };
@@ -31,30 +55,26 @@ export default function MovieSearch({ initialTitle, onSelectMovie, onManualBypas
     fetchMovies(val);
   };
 
-  // --- UPDATED: FETCH DIRECTOR ON SELECT ---
   const handleSelect = async (movie) => {
+    console.log(`👉 Selected: ${movie.title} (ID: ${movie.id})`);
     let directorName = '';
 
-    // 1. Fetch Credits
+    // Fetch Credits
     if (TMDB_API_KEY && movie.id) {
         try {
             const creditsRes = await fetch(`https://api.themoviedb.org/3/movie/${movie.id}/credits?api_key=${TMDB_API_KEY}`);
             const creditsData = await creditsRes.json();
-            
-            // Find Director
             const director = creditsData.crew?.find(person => person.job === 'Director');
             if (director) directorName = director.name;
-            
         } catch (e) {
             console.error("Failed to fetch director:", e);
         }
     }
 
-    // 2. Pass Data Back to Form
     const selection = {
       title: movie.title,
       creator: directorName, 
-      image_url: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '' // Use w500 for better quality
+      image_url: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : ''
     };
     onSelectMovie(selection);
     setSuggestions([]);
@@ -66,6 +86,8 @@ export default function MovieSearch({ initialTitle, onSelectMovie, onManualBypas
 
   return (
     <div className="relative">
+      {error && <div className="text-red-500 text-xs font-bold mb-2">⚠️ API Key Missing (Check Console)</div>}
+      
       <input
         type="text"
         value={query}
